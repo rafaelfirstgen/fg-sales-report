@@ -1,0 +1,7 @@
+# CSV exports — contain company data, keep off GitHub
+*.csv
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,2903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Weekly Report Analyzer</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Neuemontreal', Arial, sans-serif;
+  background: #f1f5f9;
+  color: #1e293b;
+  min-height: 100vh;
+}
+header {
+  background: #0b2043;
+  color: white;
+  padding: 20px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+header p  { font-size: 13px; opacity: 0.75; margin-top: 4px; }
+.header-db-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  padding: 5px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.main { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+/* ── History Panel ── */
+.history-panel {
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+  transition: background 0.15s;
+}
+.history-header:hover { background: #f8fafc; }
+.history-header.open  { border-bottom-color: #e2e8f0; }
+.history-header-left  { display: flex; align-items: center; gap: 10px; }
+.history-header-left h2 { font-size: 14px; font-weight: 700; color: #0f172a; }
+.history-count {
+  font-size: 11px; font-weight: 700;
+  background: rgba(36,145,235,0.12); color: #2491EB;
+  padding: 2px 8px; border-radius: 20px;
+}
+.history-count.empty { background: #f1f5f9; color: #94a3b8; }
+.history-chevron {
+  font-size: 12px; color: #94a3b8;
+  transition: transform 0.2s;
+}
+.history-header.open .history-chevron { transform: rotate(180deg); }
+.history-body { display: none; }
+.history-body.open { display: block; }
+
+.history-empty {
+  padding: 28px 20px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.history-list { padding: 8px 0; }
+.history-entry {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  gap: 12px;
+  border-bottom: 1px solid #f8fafc;
+  transition: background 0.12s;
+}
+.history-entry:last-child { border: none; }
+.history-entry:hover { background: #f8fafc; }
+.history-entry.active-entry { background: #eff6ff; }
+
+.he-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: rgba(36,145,235,0.12);
+  color: #2491EB;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.he-main { flex: 1; min-width: 0; }
+.he-label { font-size: 14px; font-weight: 600; color: #0f172a; }
+.he-label input {
+  font-size: 14px; font-weight: 600; color: #0f172a;
+  border: none; background: transparent; outline: none;
+  width: 100%; font-family: inherit;
+}
+.he-label input:focus {
+  background: white; border-radius: 4px;
+  box-shadow: 0 0 0 2px #2491EB;
+  padding: 2px 4px;
+}
+.he-meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.he-stats {
+  display: flex; gap: 16px; flex-shrink: 0;
+}
+.he-stat { text-align: center; }
+.he-stat .v { font-size: 15px; font-weight: 700; color: #0f172a; }
+.he-stat .k { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; }
+.he-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-load {
+  padding: 6px 14px;
+  background: #2491EB; color: white;
+  border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
+}
+.btn-load:hover { background: #1B70BB; }
+.btn-load.current { background: #64748b; cursor: default; }
+.btn-del {
+  padding: 6px 10px;
+  background: #fee2e2; color: #dc2626;
+  border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
+}
+.btn-del:hover { background: #fecaca; }
+.history-footer {
+  padding: 10px 20px;
+  border-top: 1px solid #e2e8f0;
+  display: flex; justify-content: flex-end;
+}
+.btn-clear-all {
+  font-size: 12px; color: #dc2626; background: none;
+  border: none; cursor: pointer; font-weight: 500;
+  padding: 4px 8px; border-radius: 4px;
+}
+.btn-clear-all:hover { background: #fee2e2; }
+
+/* ── Archive Banner ── */
+.archive-banner {
+  background: rgba(36,145,235,0.08);
+  border: 1px solid rgba(36,145,235,0.25);
+  border-radius: 10px;
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.archive-banner strong { color: #104378; }
+.btn-back-live {
+  font-size: 12px; font-weight: 600;
+  background: #2491EB; color: white;
+  border: none; border-radius: 6px;
+  padding: 6px 12px; cursor: pointer;
+}
+.btn-back-live:hover { background: #1B70BB; }
+
+/* ── Upload ── */
+.upload-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+.upload-card {
+  background: white;
+  border: 2px dashed #cbd5e1;
+  border-radius: 14px;
+  padding: 36px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s;
+  position: relative;
+}
+.upload-card:hover, .upload-card.drag-over {
+  border-color: #2491EB;
+  background: rgba(36,145,235,0.05);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(36,145,235,0.14);
+}
+.upload-card.loaded     { border-color: #16a34a; border-style: solid; background: #f0fdf4; }
+.upload-card.error-state{ border-color: #dc2626; background: #fef2f2; }
+.upload-icon { font-size: 40px; margin-bottom: 12px; }
+.upload-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+.upload-card p  { font-size: 13px; color: #64748b; }
+.upload-card input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.file-name { margin-top: 10px; font-size: 12px; font-weight: 600; color: #16a34a; display: none; }
+.upload-card.loaded .file-name { display: block; }
+.upload-status { margin-top: 6px; font-size: 11px; color: #94a3b8; }
+
+.analyze-btn {
+  width: 100%;
+  padding: 15px;
+  background: #2491EB;
+  color: white;
+  border: none;
+  border-radius: 100px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 16px 0 32px;
+  transition: background 0.2s, transform 0.1s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  letter-spacing: 0.2px;
+}
+.analyze-btn:hover:not(:disabled) { background: #1B70BB; transform: translateY(-1px); }
+.analyze-btn:disabled { background: #94a3b8; cursor: not-allowed; transform: none; }
+
+/* ── Results ── */
+#results { display: none; }
+.section-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; color: #0f172a; }
+
+/* Team Summary */
+.team-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.stat-box {
+  background: white;
+  border-radius: 12px;
+  padding: 22px 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  border-top: 3px solid transparent;
+}
+.stat-box.blue   { border-top-color: #2491EB; }
+.stat-box.green  { border-top-color: #16a34a; }
+.stat-box.amber  { border-top-color: #d97706; }
+.stat-box.violet { border-top-color: #38B6FF; }
+.stat-box .label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+.stat-box .value { font-size: 30px; font-weight: 800; color: #0f172a; margin: 6px 0 3px; line-height: 1; }
+.stat-box .sub   { font-size: 12px; color: #94a3b8; }
+
+/* Rep Cards */
+.rep-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+/* Partnership cards — horizontal rectangles filling full width */
+#partnership-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+#partnership-grid .rep-card {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+#partnership-grid .pcard-left {
+  width: 180px;
+  flex-shrink: 0;
+  padding: 20px;
+  border-right: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
+}
+#partnership-grid .pcard-right {
+  flex: 1;
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 20px;
+  align-content: start;
+}
+#partnership-grid .pcard-right .rep-stat {
+  padding: 5px 0;
+}
+#partnership-grid .pcard-right .pcard-divider {
+  grid-column: 1 / -1;
+  border-top: 1px solid #f1f5f9;
+  margin: 6px 0 2px;
+}
+#partnership-grid .pcard-right .pcard-section-label {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  padding: 2px 0 4px;
+}
+.rep-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  border-top: 3px solid #2491EB;
+  transition: box-shadow 0.15s;
+}
+.rep-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+.rep-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.rep-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid #e2e8f0;
+}
+.rep-avatar-initials {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; color: white;
+  border: none;
+}
+.rep-card h3 { font-size: 14px; font-weight: 700; color: #0f172a; margin: 0; }
+.rep-stat { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #f1f5f9; }
+.rep-stat:last-child { border: none; padding-bottom: 0; }
+.rep-stat .key { font-size: 12px; color: #64748b; }
+.rep-stat .val { font-size: 13px; font-weight: 700; color: #1e293b; }
+.rep-stat .val.highlight { color: #2491EB; }
+
+/* Charts */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 32px;
+}
+.chart-card {
+  background: white; border-radius: 12px; padding: 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.chart-card h3 { font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.6px; }
+
+/* Table */
+.table-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.table-wrap { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); overflow: hidden; margin-bottom: 40px; }
+table { width: 100%; border-collapse: collapse; }
+thead { background: #f8fafc; }
+th {
+  padding: 12px 16px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.6px; color: #64748b;
+  text-align: left; cursor: pointer; user-select: none; white-space: nowrap;
+  border-bottom: 1px solid #e2e8f0;
+}
+th:hover { color: #2491EB; background: #f1f5f9; }
+th .sort-icon { margin-left: 4px; font-size: 10px; opacity: 0.4; }
+th.sort-asc  .sort-icon::after { content: '▲'; opacity: 1; }
+th.sort-desc .sort-icon::after { content: '▼'; opacity: 1; }
+th:not(.sort-asc):not(.sort-desc) .sort-icon::after { content: '⇅'; }
+td { padding: 12px 16px; font-size: 13px; border-top: 1px solid #f1f5f9; }
+tbody tr:hover td { background: #f8fafc; }
+
+.badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+.badge-blue   { background: rgba(36,145,235,0.12); color: #1B70BB; }
+.badge-green  { background: #dcfce7; color: #16a34a; }
+.badge-red    { background: #fee2e2; color: #dc2626; }
+.badge-violet { background: rgba(56,182,255,0.12); color: #1B70BB; }
+
+.export-btn {
+  padding: 5px 10px; background: none; color: #94a3b8;
+  border: 1px solid #e2e8f0; border-radius: 6px; font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 4px;
+  font-family: inherit;
+}
+.export-btn:hover { color: #475569; border-color: #cbd5e1; background: #f8fafc; }
+
+/* ── Rep card extras ── */
+.rank-badge {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; flex-shrink: 0;
+  margin-left: auto;
+}
+.rank-1 { background: #fef3c7; color: #92400e; }
+.rank-2 { background: #f1f5f9; color: #475569; }
+.rank-3 { background: #fde8d8; color: #9a3412; }
+.rank-n { background: #f1f5f9; color: #94a3b8; }
+.conversion-bar {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+}
+.conversion-track {
+  flex: 1; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;
+}
+.conversion-fill { height: 100%; border-radius: 2px; background: #2491EB; transition: width 0.4s; }
+.conversion-fill.good  { background: #16a34a; }
+.conversion-fill.warn  { background: #d97706; }
+.delta { font-size: 11px; font-weight: 700; white-space: nowrap; }
+.delta-up   { color: #16a34a; }
+.delta-down { color: #dc2626; }
+.delta-zero { color: #94a3b8; }
+.attention-strip {
+  margin-top: 10px; padding: 7px 10px;
+  background: #fef2f2; border-radius: 6px;
+  font-size: 11px; color: #b91c1c; font-weight: 600;
+  display: flex; gap: 6px; align-items: center;
+}
+.repeat-row {
+  font-size: 11px; color: #64748b; padding: 4px 0 0;
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.repeat-tag {
+  background: rgba(36,145,235,0.1); color: #1B70BB;
+  padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 600;
+}
+.repeat-tag.orange { background: #fff7ed; color: #c2410c; }
+
+/* ── Summary WoW delta ── */
+.stat-delta { font-size: 12px; font-weight: 700; margin-top: 4px; }
+.stat-delta.up   { color: #16a34a; }
+.stat-delta.down { color: #dc2626; }
+.stat-delta.zero { color: #94a3b8; }
+
+/* ── Tooltip ── */
+.tip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #e2e8f0; color: #64748b;
+  font-size: 9px; font-weight: 800;
+  cursor: help; position: relative;
+  vertical-align: middle; margin-left: 4px;
+  flex-shrink: 0; font-style: normal;
+}
+.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%; transform: translateX(-50%);
+  background: #0f172a; color: white;
+  font-size: 11px; font-weight: 400; line-height: 1.5;
+  padding: 8px 11px; border-radius: 7px;
+  width: 200px; white-space: normal;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.15s; z-index: 200;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  text-align: left;
+}
+.tip::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 3px); left: 50%; transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: #0f172a;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.15s; z-index: 200;
+}
+.tip:hover::after, .tip:hover::before { opacity: 1; }
+
+.notice {
+  background: #fefce8; border: 1px solid #fde047; border-radius: 8px;
+  padding: 12px 16px; font-size: 13px; color: #713f12; margin-bottom: 12px;
+}
+.week-badge {
+  display: inline-block; background: rgba(36,145,235,0.12); color: #104378;
+  font-size: 12px; font-weight: 600; padding: 4px 10px;
+  border-radius: 20px; margin-left: 10px; vertical-align: middle;
+}
+
+/* ── Source pills on rep cards ── */
+.rep-sources { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #f1f5f9; }
+.src-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+.src-pill.portal     { background: #dbeafe; color: #1d4ed8; }
+.src-pill.conference { background: #fef3c7; color: #92400e; }
+.src-pill.referral   { background: #dcfce7; color: #166534; }
+.src-pill.linkedin   { background: #e0e7ff; color: #3730a3; }
+.src-pill.qr         { background: #f3e8ff; color: #6b21a8; }
+.src-pill.other      { background: #f1f5f9; color: #64748b; }
+.src-pill .src-count { opacity: 0.75; font-weight: 500; }
+
+/* ── Referral Activity section ── */
+.referral-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+.referral-card {
+  background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 16px 20px; display: flex; align-items: center; gap: 14px;
+  min-width: 280px; flex: 1;
+}
+.ref-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.ref-initials {
+  width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 13px; font-weight: 700; background: #e2e8f0; color: #475569;
+}
+.ref-person { text-align: center; min-width: 60px; }
+.ref-person .ref-name { font-size: 12px; font-weight: 700; color: #0f172a; }
+.ref-person .ref-role { font-size: 10px; color: #64748b; }
+.ref-arrow { font-size: 22px; color: #94a3b8; flex-shrink: 0; }
+.ref-stats { margin-left: auto; text-align: right; }
+.ref-stats .ref-count { font-size: 20px; font-weight: 800; color: #0f172a; }
+.ref-stats .ref-label { font-size: 10px; color: #64748b; margin-top: 1px; }
+.ref-stats .ref-rate  { font-size: 11px; font-weight: 600; margin-top: 4px; }
+.ref-rate.good  { color: #16a34a; }
+.ref-rate.mid   { color: #d97706; }
+.ref-rate.poor  { color: #dc2626; }
+
+/* ── Source breakdown section ── */
+.source-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.source-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
+.source-card-name { font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.source-card-name img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.source-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.source-bar-label { font-size: 11px; color: #64748b; width: 80px; display: flex; align-items: center; gap: 4px; }
+.src-q-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 13px; height: 13px; flex-shrink: 0;
+  background: #cbd5e1; color: white; border-radius: 50%;
+  font-size: 8px; font-weight: 800; cursor: help;
+  line-height: 1;
+}
+#src-tip {
+  display: none; position: fixed; z-index: 9999;
+  background: #1e293b; color: white;
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 12px; line-height: 1.7;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  pointer-events: none; min-width: 160px; max-width: 260px;
+}
+.source-bar-track { flex: 1; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+.source-bar-fill  { height: 100%; border-radius: 3px; }
+.source-bar-count { font-size: 11px; font-weight: 600; color: #374151; width: 28px; text-align: right; }
+
+.other-reps-toggle {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.other-reps-toggle:hover { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; }
+
+/* ── Period Toggle ── */
+.period-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.period-toggle {
+  display: flex;
+  background: white;
+  border-radius: 100px;
+  padding: 3px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  border: 1px solid #e2e8f0;
+  gap: 2px;
+}
+.period-btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  color: #64748b;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.period-btn.active { background: #2491EB; color: white; box-shadow: 0 1px 4px rgba(36,145,235,0.3); }
+.period-btn:hover:not(.active) { color: #0f172a; background: #f1f5f9; }
+.period-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.period-nav-btn {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 100px;
+  width: 32px; height: 32px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: #64748b;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.period-nav-btn:hover:not(:disabled) { border-color: #2491EB; color: #2491EB; }
+.period-nav-btn:disabled { opacity: 0.3; cursor: default; }
+#period-label-display {
+  font-size: 14px; font-weight: 700; color: #0f172a;
+  min-width: 150px; text-align: center;
+}
+
+/* ── Admin section ── */
+.admin-section {
+  margin-top: 56px;
+  padding-top: 32px;
+  border-top: 2px dashed #e2e8f0;
+}
+.admin-section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: #94a3b8; margin-bottom: 16px;
+}
+
+/* ── Insights Banner ── */
+.insights-banner {
+  background: #0b2043;
+  border-radius: 16px;
+  margin-bottom: 28px;
+  overflow: hidden;
+}
+.insights-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.insights-header-left {
+  display: flex; align-items: center; gap: 10px;
+}
+.insights-header-left h2 {
+  font-size: 14px; font-weight: 700; color: white; letter-spacing: -0.2px;
+}
+.insights-period-badge {
+  font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.08);
+  padding: 3px 10px; border-radius: 20px;
+}
+.insights-cards {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+  min-height: 120px;
+}
+.insights-cards.has-justcall {
+  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr 1fr;
+}
+.insight-card {
+  padding: 20px 22px;
+  border-right: 1px solid rgba(255,255,255,0.07);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.insight-card:last-child { border-right: none; }
+.insight-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.insight-label {
+  font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.45);
+  text-transform: uppercase; letter-spacing: 0.8px;
+}
+.insight-value {
+  font-size: 22px; font-weight: 800; color: white; line-height: 1.1; margin-bottom: 3px;
+}
+.insight-value.large { font-size: 26px; }
+.insight-sub {
+  font-size: 11px; color: rgba(255,255,255,0.5); line-height: 1.4;
+}
+.insight-trend {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 700; margin-top: 6px;
+  padding: 3px 8px; border-radius: 20px;
+}
+.insight-trend.up   { background: rgba(74,222,128,0.15); color: #4ade80; }
+.insight-trend.down { background: rgba(248,113,113,0.15); color: #f87171; }
+.insight-trend.neutral { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); }
+
+.insight-top-performer {
+  display: flex; gap: 14px; align-items: center;
+}
+.insight-performer-photo {
+  width: 48px; height: 48px; border-radius: 50%;
+  object-fit: cover; border: 2px solid rgba(255,255,255,0.15);
+  flex-shrink: 0;
+}
+.insight-performer-initials {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: #2491EB; color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 800; flex-shrink: 0;
+}
+.insight-alert-list {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 6px;
+}
+.insight-alert-item {
+  font-size: 11px; color: #fbbf24; display: flex; align-items: center; gap: 5px;
+}
+.insight-alert-item::before { content: '•'; color: #f59e0b; }
+
+@media (max-width: 768px) {
+  .upload-grid, .charts-grid, .team-summary { grid-template-columns: 1fr; }
+  header { padding: 18px 20px; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .main  { padding: 20px 16px; }
+  .he-stats { display: none; }
+  .insights-cards { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div id="src-tip"></div>
+
+<header>
+  <div style="display:flex; align-items:center; gap:20px;">
+    <img src="https://cdn.prod.website-files.com/696c29d351dd36aa7af97363/6972db74e5d042b89fc973c8_Frame%202087329151.svg"
+         alt="FirstGen" height="26" style="display:block;">
+    <div style="width:1px; height:32px; background:rgba(255,255,255,0.2);"></div>
+    <div>
+      <h1>Sales Weekly Report Analyzer</h1>
+      <p>Upload your Calendly + Zoom CSV exports to get per-rep performance insights</p>
+    </div>
+  </div>
+  <div class="header-db-badge" id="db-badge">⏳ Loading DB…</div>
+</header>
+
+<div class="main">
+
+  <!-- ══════════════════════════════════════════════════════
+       TOP: Insights Dashboard
+  ══════════════════════════════════════════════════════ -->
+  <div id="results" style="display:none">
+    <div id="archive-banner" style="display:none"></div>
+    <div id="notice-area"></div>
+
+    <!-- Insights Banner -->
+    <div id="insights-section"></div>
+
+    <!-- Period Toggle -->
+    <div class="period-row">
+      <div class="period-toggle">
+        <button class="period-btn" data-period="day"     onclick="setPeriod('day')">Day</button>
+        <button class="period-btn" data-period="week"    onclick="setPeriod('week')">Week</button>
+        <button class="period-btn" data-period="month"   onclick="setPeriod('month')">Month</button>
+        <button class="period-btn" data-period="quarter" onclick="setPeriod('quarter')">Quarter</button>
+        <button class="period-btn" data-period="year"    onclick="setPeriod('year')">Year</button>
+        <button class="period-btn active" data-period="all" onclick="setPeriod('all')">All Time</button>
+      </div>
+      <div class="period-nav">
+        <button class="period-nav-btn" id="period-prev" onclick="navigatePeriod(-1)">‹</button>
+        <span id="period-label-display">—</span>
+        <button class="period-nav-btn" id="period-next" onclick="navigatePeriod(1)">›</button>
+      </div>
+    </div>
+
+    <div class="section-title">Team Summary</div>
+    <div class="team-summary" id="team-summary"></div>
+
+    <div class="section-title">Sales Team</div>
+    <div class="rep-grid" id="rep-grid"></div>
+
+    <div id="partnership-section" style="display:none; margin-bottom:32px;">
+      <div class="section-title" style="margin-top:8px">Partnerships &amp; Big Accounts</div>
+      <div class="rep-grid" id="partnership-grid"></div>
+    </div>
+
+    <div id="referral-section" style="display:none; margin-bottom:32px;"></div>
+    <div id="source-section"   style="display:none; margin-bottom:32px;"></div>
+
+    <div id="other-reps-section" style="display:none; margin-bottom:32px;">
+      <button class="other-reps-toggle" id="other-reps-toggle" onclick="toggleOtherReps()">
+        <span id="other-reps-label">▶ Show other participants</span>
+      </button>
+      <div class="rep-grid" id="other-rep-grid" style="display:none; margin-top:12px;"></div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Appointments Scheduled</h3>
+        <canvas id="chart-appointments"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Zoom Talk Time (minutes)</h3>
+        <canvas id="chart-zoom"></canvas>
+      </div>
+    </div>
+
+    <div class="table-header-row">
+      <div class="section-title" style="margin-bottom:0">Full Data Table</div>
+      <button class="export-btn" onclick="exportCSV()">⬇ CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table id="data-table">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       BOTTOM: Admin — Import / History
+  ══════════════════════════════════════════════════════ -->
+  <div class="admin-section">
+    <div class="admin-section-label">Import New Report</div>
+
+    <!-- History Panel -->
+    <div class="history-panel" id="history-panel">
+      <div class="history-header" id="history-toggle" onclick="toggleHistory()">
+        <div class="history-header-left">
+          <span style="font-size:18px">🗂</span>
+          <h2>Report History</h2>
+          <span class="history-count empty" id="history-count">0 saved</span>
+        </div>
+        <span class="history-chevron" id="history-chevron">▼</span>
+      </div>
+      <div class="history-body" id="history-body">
+        <div class="history-empty" id="history-empty">
+          No reports saved yet. Analyze your first report and it will appear here.
+        </div>
+        <div class="history-list" id="history-list" style="display:none"></div>
+        <div class="history-footer" id="history-footer" style="display:none">
+          <button class="btn-clear-all" onclick="clearAllHistory()">🗑 Clear all history</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div class="upload-grid">
+      <div class="upload-card" id="calendly-drop"
+        ondragover="onDragOver(event,'calendly-drop')"
+        ondragleave="onDragLeave(event,'calendly-drop')"
+        ondrop="onDrop(event,'calendly')">
+        <div class="upload-icon">📅</div>
+        <h3>Calendly Export</h3>
+        <p>Export → Scheduled Events → All team members</p>
+        <input type="file" accept=".csv,.txt" onchange="handleFile(event,'calendly')">
+        <div class="file-name" id="calendly-name"></div>
+        <div class="upload-status" id="calendly-status">Drop file here or click to browse</div>
+      </div>
+      <div class="upload-card" id="zoom-drop"
+        ondragover="onDragOver(event,'zoom-drop')"
+        ondragleave="onDragLeave(event,'zoom-drop')"
+        ondrop="onDrop(event,'zoom')">
+        <div class="upload-icon">💻</div>
+        <h3>Zoom Report</h3>
+        <p>Reports → Usage → Meetings or Active Hosts CSV</p>
+        <input type="file" accept=".csv,.txt" onchange="handleFile(event,'zoom')">
+        <div class="file-name" id="zoom-name"></div>
+        <div class="upload-status" id="zoom-status">Drop file here or click to browse</div>
+      </div>
+      <div class="upload-card" id="justcall-drop"
+        ondragover="onDragOver(event,'justcall-drop')"
+        ondragleave="onDragLeave(event,'justcall-drop')"
+        ondrop="onDrop(event,'justcall')">
+        <div class="upload-icon">📞</div>
+        <h3>JustCall Log <span style="font-size:11px;font-weight:500;color:#94a3b8">(optional)</span></h3>
+        <p>Call Logs export from JustCall dashboard</p>
+        <input type="file" accept=".csv,.txt" onchange="handleFile(event,'justcall')">
+        <div class="file-name" id="justcall-name"></div>
+        <div class="upload-status" id="justcall-status">Drop file here or click to browse</div>
+      </div>
+    </div>
+
+    <button class="analyze-btn" id="analyze-btn" onclick="analyze()" disabled>
+      ⚡ Analyze Reports
+    </button>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// IndexedDB — SalesReportsDB
+// ═══════════════════════════════════════════════════════════════════
+const DB_NAME    = 'SalesReportsDB';
+const DB_VERSION = 1;
+const STORE      = 'reports';
+let db = null;
+let viewingId = null; // null = live, number = archived
+
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(STORE)) {
+        const s = d.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+        s.createIndex('analyzedAt', 'analyzedAt');
+      }
+    };
+
+    req.onsuccess = e => {
+      db = e.target.result;
+      resolve(db);
+    };
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+function dbAdd(record) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).add(record);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+function dbGetAll() {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => resolve([...req.result].reverse()); // newest first
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+function dbGet(id) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).get(id);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+function dbUpdate(record) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).put(record);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+function dbDelete(id) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+function dbClear() {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).clear();
+    req.onsuccess = () => resolve();
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+function dbRename(id, label) {
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    const req   = store.get(id);
+    req.onsuccess = () => {
+      const rec = req.result;
+      if (!rec) return resolve();
+      rec.label = label;
+      store.put(rec).onsuccess = () => resolve();
+    };
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// History UI
+// ═══════════════════════════════════════════════════════════════════
+let historyOpen = false;
+
+function toggleHistory() {
+  historyOpen = !historyOpen;
+  document.getElementById('history-toggle').classList.toggle('open', historyOpen);
+  document.getElementById('history-body').classList.toggle('open', historyOpen);
+}
+
+async function loadHistory() {
+  if (!db) return;
+  const records = await dbGetAll();
+
+  const countEl = document.getElementById('history-count');
+  countEl.textContent = records.length ? `${records.length} saved` : '0 saved';
+  countEl.classList.toggle('empty', records.length === 0);
+
+  const listEl   = document.getElementById('history-list');
+  const emptyEl  = document.getElementById('history-empty');
+  const footerEl = document.getElementById('history-footer');
+
+  if (!records.length) {
+    listEl.style.display  = 'none';
+    emptyEl.style.display = 'block';
+    footerEl.style.display= 'none';
+    return;
+  }
+
+  listEl.style.display  = 'block';
+  emptyEl.style.display = 'none';
+  footerEl.style.display= 'flex';
+
+  listEl.innerHTML = records.map(r => {
+    const isActive = r.id === viewingId;
+    const date = new Date(r.analyzedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `
+      <div class="history-entry${isActive ? ' active-entry' : ''}" id="he-${r.id}">
+        <div class="he-icon">📊</div>
+        <div class="he-main">
+          <div class="he-label">
+            <input type="text" value="${escHtml(r.label)}"
+              onblur="renameEntry(${r.id}, this.value)"
+              onkeydown="if(event.key==='Enter')this.blur()"
+              title="Click to rename">
+          </div>
+          <div class="he-meta">
+            Analyzed ${date} &nbsp;·&nbsp;
+            ${r.calendlyFile} + ${r.zoomFile}
+          </div>
+        </div>
+        <div class="he-stats">
+          <div class="he-stat"><div class="v">${r.totalAppts}</div><div class="k">Appts</div></div>
+          <div class="he-stat"><div class="v">${r.repCount}</div><div class="k">Reps</div></div>
+          <div class="he-stat"><div class="v">${fmtTime(r.totalMins)}</div><div class="k">Talk</div></div>
+        </div>
+        <div class="he-actions">
+          <button class="btn-load${isActive ? ' current' : ''}" onclick="loadHistoryEntry(${r.id})"
+            ${isActive ? 'disabled' : ''}>
+            ${isActive ? '● Viewing' : 'Load'}
+          </button>
+          <button class="btn-del" onclick="deleteHistoryEntry(${r.id})">🗑</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Auto-open panel if there are records and it hasn't been manually closed
+  if (records.length && !historyOpen) toggleHistory();
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function deleteHistoryEntry(id) {
+  if (!confirm('Delete this report from history?')) return;
+  await dbDelete(id);
+  if (viewingId === id) {
+    viewingId = null;
+    hideBanner();
+  }
+  await loadHistory();
+}
+
+async function clearAllHistory() {
+  if (!confirm('Delete all saved reports? This cannot be undone.')) return;
+  await dbClear();
+  viewingId = null;
+  hideBanner();
+  await loadHistory();
+}
+
+async function renameEntry(id, newLabel) {
+  const trimmed = newLabel.trim();
+  if (!trimmed) return;
+  await dbRename(id, trimmed);
+  await loadHistory();
+}
+
+async function loadHistoryEntry(id, silent = false) {
+  const record = await dbGet(id);
+  if (!record) return;
+
+  viewingId = id;
+  tableData = record.tableData;
+  document.getElementById('notice-area').innerHTML = '';
+
+  // Find offset for this record in case user navigates from week view
+  cachedRecords = await dbGetAll();
+  const idx = cachedRecords.findIndex(r => r.id === id);
+  // Show in week view so the archive banner makes sense
+  activePeriod = 'week';
+  periodOffset = -(idx >= 0 ? idx : 0);
+  prevTableData = cachedRecords[idx + 1]?.tableData || [];
+
+  document.querySelectorAll('.period-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.period === 'week');
+  });
+  updatePeriodNav('week', periodOffset, cachedRecords);
+
+  const utmAgg = aggregateUtmData([record]);
+  currentUtmSources = utmAgg.sources;
+  currentReferrals  = utmAgg.referrals;
+  renderInsights(record.tableData, prevTableData);
+  renderTeamSummary(record.tableData, prevTableData);
+  renderRepCards(record.tableData);
+  renderReferrals(currentReferrals);
+  renderSourceBreakdown(record.tableData, currentUtmSources);
+  renderCharts(record.tableData);
+  renderTable(record.tableData);
+
+  // Only show archive banner when explicitly loading an older entry (not on auto-load)
+  if (silent) {
+    hideBanner();
+  } else {
+    const date = new Date(record.analyzedAt).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+    document.getElementById('archive-banner').style.display = 'flex';
+    document.getElementById('archive-banner').innerHTML = `
+      <div><strong>📂 Viewing:</strong> ${escHtml(record.label)} — saved ${date}</div>
+      <button class="btn-back-live" onclick="closeBanner()">← Back to latest</button>
+    `;
+    document.getElementById('archive-banner').className = 'archive-banner';
+  }
+
+  document.getElementById('results').style.display = 'block';
+  if (!silent) document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  await loadHistory(); // refresh active highlight
+}
+
+function hideBanner() {
+  document.getElementById('archive-banner').style.display = 'none';
+}
+
+async function closeBanner() {
+  hideBanner();
+  // Restore the period the user was in before opening the archive entry
+  const savedPeriod = activePeriod;
+  const savedOffset = periodOffset;
+  const records = await dbGetAll();
+  if (records.length) {
+    await loadHistoryEntry(records[0].id, true); // silent — sets activePeriod to 'week' internally
+    // Restore whatever period was active before the archive was opened
+    activePeriod = savedPeriod;
+    periodOffset = savedOffset;
+    await loadPeriodData();
+  } else {
+    viewingId = null;
+    document.getElementById('results').style.display = 'none';
+    await loadHistory();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CSV Parser — handles quoted fields, multiline values, BOM
+// ═══════════════════════════════════════════════════════════════════
+function parseCSV(raw) {
+  if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+  raw = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const rows = [];
+  let i = 0, n = raw.length;
+  while (i < n) {
+    if (raw[i] === '\n') { i++; continue; }
+    const row = [];
+    while (i < n && raw[i] !== '\n') {
+      if (raw[i] === '"') {
+        i++; let field = '';
+        while (i < n) {
+          if (raw[i] === '"' && raw[i+1] === '"') { field += '"'; i += 2; }
+          else if (raw[i] === '"') { i++; break; }
+          else { field += raw[i++]; }
+        }
+        row.push(field);
+        if (raw[i] === ',') i++;
+      } else {
+        let field = '';
+        while (i < n && raw[i] !== ',' && raw[i] !== '\n') field += raw[i++];
+        row.push(field.trim());
+        if (raw[i] === ',') i++;
+      }
+    }
+    if (raw[i] === '\n') i++;
+    if (row.some(c => c !== '')) rows.push(row);
+  }
+  return rows;
+}
+
+function findHeaderRow(rows, keywords) {
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const joined = rows[i].join(' ').toLowerCase();
+    if (keywords.some(k => joined.includes(k))) return i;
+  }
+  return 0;
+}
+
+function toObjects(rows, headerIdx) {
+  const headers = rows[headerIdx].map(h => h.trim());
+  return rows.slice(headerIdx + 1)
+    .filter(r => r.some(c => c !== ''))
+    .map(row => {
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (row[i] || '').trim(); });
+      return obj;
+    });
+}
+
+function findCol(sample, candidates) {
+  const keys = Object.keys(sample);
+  for (const c of candidates) {
+    const found = keys.find(k => k.toLowerCase().includes(c.toLowerCase()));
+    if (found) return found;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// File Handling
+// ═══════════════════════════════════════════════════════════════════
+const SALES_TEAM = [
+  'Josh Naasz',
+  'Eric Scharlow', 'Tabitha Akin', 'Steven Russel',
+];
+
+// Separate category — partnerships & big accounts
+const PARTNERSHIPS = ['Stefan Street', 'David Pavlik'];
+
+const REP_PHOTOS = {
+  'david':   'photos/David.jpg',
+  'josh':    'photos/Josh.jpg',
+  'stefan':  'photos/Stefan.png',
+  'eric':    'photos/Eric.png',
+  'tabitha': 'photos/Tabitha.png',
+  'steven':  'photos/Steven.png',
+};
+
+function repPhoto(repName) {
+  const first = repName.trim().split(' ')[0].toLowerCase();
+  return REP_PHOTOS[first] || null;
+}
+
+// Reps who legitimately appear in Calendly as first-name-only.
+// Anyone NOT in this list must match by full name (prevents terminated/different
+// people with the same first name being misclassified as a current team member).
+const FIRST_NAME_ALIASES = new Set(['stefan', 'david', 'eric', 'steven', 'tabitha']);
+
+function isTeamMember(repName) {
+  const norm = repName.toLowerCase().trim();
+  return SALES_TEAM.some(t => {
+    const tn = t.toLowerCase();
+    if (tn === norm) return true; // exact full-name match
+    // First-name-only match only for known aliases
+    const tfirst = tn.split(' ')[0];
+    return norm === tfirst && FIRST_NAME_ALIASES.has(tfirst);
+  });
+}
+
+function isPartnership(repName) {
+  const norm = repName.toLowerCase().trim();
+  return PARTNERSHIPS.some(t => {
+    const tn = t.toLowerCase();
+    if (tn === norm) return true;
+    const tfirst = tn.split(' ')[0];
+    return norm === tfirst && FIRST_NAME_ALIASES.has(tfirst);
+  });
+}
+
+const state = { calendly: null, zoom: null, justcall: null, calendlyName: '', zoomName: '', justcallName: '' };
+let tableData = [];
+let prevTableData    = []; // previous period for WoW comparison
+let currentUtmSources = {}; // { repName: { source: count } }
+let currentReferrals  = []; // [{ from, to, count, cancelled }]
+let sortCol = 1, sortDir = -1;
+
+// ── Period state ──
+let activePeriod = 'all';
+let periodOffset = 0; // 0 = most recent, negative = going back
+let cachedRecords = []; // sorted newest→oldest from DB
+
+function getRecordDate(r) {
+  return new Date(r.dataFrom || r.analyzedAt);
+}
+
+function aggregateRecords(records) {
+  const byRep = {};
+  records.forEach(rec => {
+    (rec.tableData || []).forEach(row => {
+      if (!byRep[row.rep]) {
+        byRep[row.rep] = {
+          rep: row.rep,
+          isTeam: row.isTeam,
+          isPartnership: row.isPartnership || isPartnership(row.rep),
+          totalAppointments: 0, activeAppointments: 0,
+          cancelledAppointments: 0, zoomMeetings: 0, zoomMinutes: 0,
+          followUps: 0, rescheduled: 0,
+          jcCalls: 0, jcCompleted: 0, jcMissed: 0,
+          jcOutbound: 0, jcInbound: 0, jcSeconds: 0,
+        };
+      }
+      const r = byRep[row.rep];
+      r.totalAppointments     += row.totalAppointments     || 0;
+      r.activeAppointments    += row.activeAppointments    || 0;
+      r.cancelledAppointments += row.cancelledAppointments || 0;
+      r.zoomMeetings          += row.zoomMeetings          || 0;
+      r.zoomMinutes           += row.zoomMinutes           || 0;
+      r.followUps             += row.followUps             || 0;
+      r.rescheduled           += row.rescheduled           || 0;
+      r.jcCalls               += row.jcCalls               || 0;
+      r.jcCompleted           += row.jcCompleted           || 0;
+      r.jcMissed              += row.jcMissed              || 0;
+      r.jcOutbound            += row.jcOutbound            || 0;
+      r.jcInbound             += row.jcInbound             || 0;
+      r.jcSeconds             += row.jcSeconds             || 0;
+    });
+  });
+  return Object.values(byRep).map(r => ({
+    ...r,
+    conversionRate: r.totalAppointments > 0
+      ? Math.round(r.activeAppointments / r.totalAppointments * 100)
+      : null,
+  })).sort((a, b) => {
+    const aOrder = a.isTeam ? 0 : a.isPartnership ? 1 : 2;
+    const bOrder = b.isTeam ? 0 : b.isPartnership ? 1 : 2;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return b.totalAppointments - a.totalAppointments || b.zoomMeetings - a.zoomMeetings;
+  });
+}
+
+function aggregateUtmData(records) {
+  const sources = {};
+  const refMap  = {};
+  records.forEach(rec => {
+    Object.entries(rec.utmSources || {}).forEach(([rep, srcs]) => {
+      if (!sources[rep]) sources[rep] = {};
+      Object.entries(srcs).forEach(([src, cnt]) => {
+        sources[rep][src] = (sources[rep][src] || 0) + cnt;
+      });
+    });
+    (rec.referrals || []).forEach(r => {
+      const key = r.from + '->' + r.to;
+      if (!refMap[key]) refMap[key] = { from: r.from, to: r.to, count: 0, cancelled: 0 };
+      refMap[key].count     += r.count     || 0;
+      refMap[key].cancelled += r.cancelled || 0;
+    });
+  });
+  return {
+    sources,
+    referrals: Object.values(refMap).sort((a,b) => b.count - a.count),
+  };
+}
+
+function buildDayTableData(dayData, dateStr) {
+  const day = dayData[dateStr] || {};
+  const allReps = new Set([...SALES_TEAM, ...PARTNERSHIPS, ...Object.keys(day)]);
+  return Array.from(allReps).map(rep => ({
+    rep,
+    isTeam: isTeamMember(rep),
+    isPartnership: isPartnership(rep),
+    totalAppointments:    day[rep]?.total     || 0,
+    activeAppointments:   day[rep]?.active    || 0,
+    cancelledAppointments: day[rep]?.cancelled || 0,
+    zoomMeetings: 0,
+    zoomMinutes:  0,
+  })).filter(r => r.isTeam || r.isPartnership || r.totalAppointments > 0)
+    .sort((a, b) => {
+      if (a.isTeam !== b.isTeam) return a.isTeam ? -1 : 1;
+      return b.totalAppointments - a.totalAppointments;
+    });
+}
+
+function periodLabel(period, offset, records) {
+  const now = new Date();
+  if (period === 'all') {
+    if (!records.length) return 'All Time';
+    const oldest = records[records.length - 1];
+    const newest = records[0];
+    const fmt = r => {
+      const d = r.dataFrom ? new Date(r.dataFrom) : new Date(r.analyzedAt);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    const fmtTo = r => {
+      const d = r.dataTo ? new Date(r.dataTo) : new Date(r.analyzedAt);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    return `${fmt(oldest)} – ${fmtTo(newest)}`;
+  }
+  if (period === 'week') {
+    const weeks = allAvailableWeeks(records);
+    const idx = weeks.length - 1 + offset; // offset 0 → most recent week
+    if (idx < 0 || idx >= weeks.length) return '—';
+    const start = new Date(weeks[idx] + 'T12:00:00');
+    const end   = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const fmtY = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return start.getFullYear() === end.getFullYear()
+      ? `${fmt(start)} – ${fmtY(end)}`
+      : `${fmtY(start)} – ${fmtY(end)}`;
+  }
+  if (period === 'day') {
+    const days = allAvailableDays(records);
+    const idx = days.length - 1 + offset; // offset 0 → last day
+    if (idx < 0 || idx >= days.length) return '—';
+    const d = new Date(days[idx].dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  if (period === 'month') {
+    const base = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    return base.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+  if (period === 'quarter') {
+    let yr = now.getFullYear(), q = Math.floor(now.getMonth() / 3); // 0-3
+    let totalQ = yr * 4 + q + offset;
+    yr = Math.floor(totalQ / 4);
+    q = totalQ % 4;
+    return `Q${q + 1} ${yr}`;
+  }
+  if (period === 'year') {
+    return String(now.getFullYear() + offset);
+  }
+  return '—';
+}
+
+function allAvailableDays(records) {
+  const seen = new Set();
+  const list = [];
+  records.forEach(r => {
+    Object.keys(r.dayData || {}).sort().forEach(ds => {
+      if (!seen.has(ds)) { seen.add(ds); list.push({ recordId: r.id, dateStr: ds, rec: r }); }
+    });
+  });
+  return list.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+}
+
+function allAvailableWeeks(records) {
+  // Returns sorted array of Monday date-strings for every week that has any data
+  const days = allAvailableDays(records);
+  const weekStarts = new Set();
+  days.forEach(({ dateStr }) => {
+    const d = new Date(dateStr + 'T12:00:00');
+    const dow = d.getDay(); // 0=Sun … 6=Sat
+    const toMon = dow === 0 ? 6 : dow - 1;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - toMon);
+    weekStarts.add(mon.toISOString().slice(0, 10));
+  });
+  return [...weekStarts].sort();
+}
+
+function buildWeekTableData(records, weekStartStr) {
+  // Aggregate Calendly dayData for the 7 days starting on weekStartStr
+  const weekDays = [];
+  const ws = new Date(weekStartStr + 'T00:00:00');
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(ws);
+    d.setDate(ws.getDate() + i);
+    weekDays.push(d.toISOString().slice(0, 10));
+  }
+  const combined = {};
+  records.forEach(rec => {
+    const dd = rec.dayData || {};
+    weekDays.forEach(ds => {
+      Object.entries(dd[ds] || {}).forEach(([rep, st]) => {
+        if (!combined[rep]) combined[rep] = { total: 0, active: 0, cancelled: 0 };
+        combined[rep].total     += st.total     || 0;
+        combined[rep].active    += st.active    || 0;
+        combined[rep].cancelled += st.cancelled || 0;
+      });
+    });
+  });
+  const allReps = new Set([...SALES_TEAM, ...PARTNERSHIPS, ...Object.keys(combined)]);
+  return Array.from(allReps).map(rep => ({
+    rep,
+    isTeam: isTeamMember(rep),
+    isPartnership: isPartnership(rep),
+    totalAppointments:     combined[rep]?.total     || 0,
+    activeAppointments:    combined[rep]?.active    || 0,
+    cancelledAppointments: combined[rep]?.cancelled || 0,
+    zoomMeetings: 0,
+    zoomMinutes:  0,
+    conversionRate: combined[rep]?.total
+      ? Math.round((combined[rep].active / combined[rep].total) * 100) : null,
+  })).filter(r => r.isTeam || r.isPartnership || r.totalAppointments > 0)
+    .sort((a, b) => {
+      const ao = a.isTeam ? 0 : a.isPartnership ? 1 : 2;
+      const bo = b.isTeam ? 0 : b.isPartnership ? 1 : 2;
+      if (ao !== bo) return ao - bo;
+      return b.totalAppointments - a.totalAppointments;
+    });
+}
+
+function recordsInPeriod(period, offset, records) {
+  const now = new Date();
+  if (period === 'week') {
+    const idx = -offset;
+    return records[idx] ? [records[idx]] : [];
+  }
+  if (period === 'month') {
+    const base = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const yr = base.getFullYear(), mo = base.getMonth();
+    return records.filter(r => {
+      const d = getRecordDate(r);
+      return d.getFullYear() === yr && d.getMonth() === mo;
+    });
+  }
+  if (period === 'quarter') {
+    let yr = now.getFullYear(), q = Math.floor(now.getMonth() / 3);
+    let totalQ = yr * 4 + q + offset;
+    yr = Math.floor(totalQ / 4);
+    q = totalQ % 4;
+    return records.filter(r => {
+      const d = getRecordDate(r);
+      return d.getFullYear() === yr && Math.floor(d.getMonth() / 3) === q;
+    });
+  }
+  if (period === 'year') {
+    const yr = now.getFullYear() + offset;
+    return records.filter(r => getRecordDate(r).getFullYear() === yr);
+  }
+  return [];
+}
+
+function updatePeriodNav(period, offset, records) {
+  const prevBtn = document.getElementById('period-prev');
+  const nextBtn = document.getElementById('period-next');
+  const labelEl = document.getElementById('period-label-display');
+  labelEl.textContent = periodLabel(period, offset, records);
+
+  if (period === 'all') {
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+    return;
+  }
+  if (period === 'week') {
+    const weeks = allAvailableWeeks(records);
+    const idx = weeks.length - 1 + offset;
+    nextBtn.disabled = idx >= weeks.length - 1;
+    prevBtn.disabled = idx <= 0;
+  } else if (period === 'day') {
+    const days = allAvailableDays(records);
+    const idx = days.length - 1 + offset;
+    nextBtn.disabled = idx >= days.length - 1;
+    prevBtn.disabled = idx <= 0;
+  } else {
+    // For month/quarter/year: disable next when it goes past most recent data
+    const nextRecords = recordsInPeriod(period, offset + 1, records);
+    nextBtn.disabled = nextRecords.length === 0;
+    prevBtn.disabled = recordsInPeriod(period, offset - 1, records).length === 0;
+  }
+}
+
+async function loadPeriodData() {
+  if (!db) return;
+  // Snapshot period/offset BEFORE the async DB call so nothing can corrupt them mid-await
+  const period = activePeriod;
+  const offset = periodOffset;
+  cachedRecords = await dbGetAll(); // newest first
+
+  let data, prevData = [];
+
+  if (period === 'all') {
+    data     = cachedRecords.length ? aggregateRecords(cachedRecords) : [];
+    prevData = []; // no comparison for all-time
+  } else if (period === 'day') {
+    const days = allAvailableDays(cachedRecords);
+    const idx = days.length - 1 + offset;
+    if (idx < 0 || idx >= days.length) {
+      data = [];
+    } else {
+      const { rec, dateStr } = days[idx];
+      data = buildDayTableData(rec.dayData || {}, dateStr);
+      if (idx > 0) prevData = buildDayTableData(days[idx-1].rec.dayData || {}, days[idx-1].dateStr);
+    }
+  } else if (period === 'week') {
+    const weeks = allAvailableWeeks(cachedRecords);
+    const idx = weeks.length - 1 + offset; // offset 0 → most recent week
+    if (idx >= 0 && idx < weeks.length) {
+      data     = buildWeekTableData(cachedRecords, weeks[idx]);
+      prevData = idx > 0 ? buildWeekTableData(cachedRecords, weeks[idx - 1]) : [];
+    } else {
+      data = [];
+    }
+  } else {
+    const matching     = recordsInPeriod(period, offset,     cachedRecords);
+    const prevMatching = recordsInPeriod(period, offset - 1, cachedRecords);
+    data     = matching.length     ? aggregateRecords(matching)     : [];
+    prevData = prevMatching.length ? aggregateRecords(prevMatching) : [];
+  }
+
+  // Re-apply ranks after aggregation (aggregateRecords doesn't assign rank)
+  let ri = 0;
+  data.forEach(r => { if (r.isTeam) r.rank = ++ri; });
+
+  tableData = data;
+  prevTableData = prevData;
+
+  // Aggregate UTM/referral data for the same set of records used
+  const utmRecords = period === 'all' ? cachedRecords
+    : period === 'week' ? cachedRecords // aggregate UTM across all records for any week
+    : period === 'day'  ? []
+    : recordsInPeriod(period, offset, cachedRecords);
+  const utmAgg = aggregateUtmData(utmRecords);
+  currentUtmSources = utmAgg.sources;
+  currentReferrals  = utmAgg.referrals;
+
+  updatePeriodNav(period, offset, cachedRecords);
+
+  document.querySelectorAll('.period-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.period === period);
+  });
+
+  if (!data.length) {
+    document.getElementById('notice-area').innerHTML =
+      '<div class="notice">No saved data found for this period. Upload and analyze reports to populate it.</div>';
+    renderInsights([], []);
+    renderTeamSummary([], []);
+    renderRepCards([]);
+    renderReferrals([]);
+    renderSourceBreakdown([], {});
+    renderCharts([]);
+    renderTable([]);
+    return;
+  }
+
+  document.getElementById('notice-area').innerHTML = '';
+  renderInsights(data, prevData);
+  renderTeamSummary(data, prevData);
+  renderRepCards(data);
+  renderReferrals(currentReferrals);
+  renderSourceBreakdown(data, currentUtmSources);
+  renderCharts(data);
+  renderTable(data);
+}
+
+async function setPeriod(p) {
+  if (activePeriod === p) return;
+  // When switching, align offset: for week pick the record closest to currently shown date
+  if (p === 'week') {
+    periodOffset = 0; // default to most recent
+  } else if (p === 'day') {
+    periodOffset = 0; // default to most recent day
+  } else {
+    periodOffset = 0; // default current month/quarter/year
+  }
+  activePeriod = p;
+  await loadPeriodData();
+}
+
+async function navigatePeriod(dir) {
+  periodOffset += dir;
+  await loadPeriodData();
+}
+const charts = {};
+
+function onDragOver(e, id) { e.preventDefault(); document.getElementById(id).classList.add('drag-over'); }
+function onDragLeave(e, id) { document.getElementById(id).classList.remove('drag-over'); }
+function onDrop(e, type) {
+  e.preventDefault();
+  document.getElementById(type + '-drop').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) loadFile(file, type);
+}
+function handleFile(e, type) {
+  const file = e.target.files[0];
+  if (file) loadFile(file, type);
+}
+
+function loadFile(file, type) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const rows = parseCSV(e.target.result);
+      state[type] = rows;
+      state[type + 'Name'] = file.name;
+      document.getElementById(type + '-drop').classList.add('loaded');
+      document.getElementById(type + '-drop').classList.remove('error-state');
+      document.getElementById(type + '-name').textContent = `✓ ${file.name}`;
+      document.getElementById(type + '-status').textContent = `${rows.length - 1} rows detected`;
+    } catch(err) {
+      document.getElementById(type + '-drop').classList.add('error-state');
+      document.getElementById(type + '-status').textContent = 'Error reading file';
+    }
+    if (state.calendly && state.zoom) document.getElementById('analyze-btn').disabled = false;
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Calendly Analysis
+// ═══════════════════════════════════════════════════════════════════
+function analyzeCalendly(rawRows) {
+  const notices  = [];
+  const headerIdx = findHeaderRow(rawRows, ['user name', 'invitee', 'event', 'host', 'start']);
+  const rows = toObjects(rawRows, headerIdx);
+  if (!rows.length) { notices.push('Calendly file appears empty or unrecognized.'); return { byRep: {}, notices }; }
+
+  const sample         = rows[0];
+  const repCol         = findCol(sample, ['User Name', 'Host Name', 'Host', 'Owner', 'Assigned To', 'Rep']);
+  const canceledCol    = findCol(sample, ['Canceled', 'Cancelled', 'Is Canceled', 'Is Cancelled']);
+  const statusCol      = findCol(sample, ['Invitee Status', 'Status', 'Event Status', 'Booking Status']);
+  const startCol       = findCol(sample, ['Start Date', 'Event Start', 'Start Time', 'Date']);
+  const inviteeEmailCol= findCol(sample, ['Invitee Email', 'Guest Email', 'Email']);
+  const inviteeNameCol = findCol(sample, ['Invitee Name', 'Guest Name', 'Client Name', 'Customer Name', 'Attendee']);
+  const utmSourceCol   = findCol(sample, ['UTM Source']);
+  const utmMediumCol   = findCol(sample, ['UTM Medium']);
+  const utmCampaignCol = findCol(sample, ['UTM Campaign']);
+
+  if (!repCol) notices.push('Calendly: Could not find a rep/host column. Grouping by first column.');
+
+  let minDate = null, maxDate = null;
+  const byDay      = {};
+  const byRep      = {};
+  const invByRep   = {}; // { repName: { inviteeId: { active, cancelled } } }
+  const byRepSrcs  = {}; // { repName: { sourceBucket: count } }
+  const refMap     = {}; // { 'from->to': { from, to, count, cancelled } }
+  const teamFirstNames = [...SALES_TEAM, ...PARTNERSHIPS].map(n => n.split(' ')[0].toLowerCase());
+  const firstCol   = Object.keys(rows[0])[0];
+
+  rows.forEach(row => {
+    const rep = (repCol ? row[repCol] : row[firstCol] || 'Unknown').trim();
+    if (!rep) return;
+    if (!byRep[rep]) byRep[rep] = { total: 0, active: 0, cancelled: 0 };
+    byRep[rep].total++;
+
+    let isCancelled = false;
+    if (canceledCol) {
+      isCancelled = (row[canceledCol] || '').toUpperCase() === 'TRUE';
+    } else if (statusCol) {
+      isCancelled = (row[statusCol] || '').toLowerCase().includes('cancel');
+    }
+
+    if (isCancelled) byRep[rep].cancelled++;
+    else byRep[rep].active++;
+
+    // Invitee tracking for follow-up / reschedule detection
+    const invId = (inviteeEmailCol && row[inviteeEmailCol]?.trim())
+      ? row[inviteeEmailCol].toLowerCase().trim()
+      : (inviteeNameCol && row[inviteeNameCol]?.trim())
+        ? row[inviteeNameCol].toLowerCase().trim()
+        : null;
+    if (invId) {
+      if (!invByRep[rep]) invByRep[rep] = {};
+      if (!invByRep[rep][invId]) invByRep[rep][invId] = { active: 0, cancelled: 0 };
+      if (isCancelled) invByRep[rep][invId].cancelled++;
+      else invByRep[rep][invId].active++;
+    }
+
+    // ── UTM source tracking ──
+    const rawSrc = (utmSourceCol ? (row[utmSourceCol] || '') : '').trim().toLowerCase();
+    const rawMed = (utmMediumCol ? (row[utmMediumCol] || '') : '').trim().toLowerCase();
+    // Bucket: prefer source, fall back to medium; ignore very long strings (noise)
+    let srcBucket = rawSrc || rawMed || 'unknown';
+    if (srcBucket.length > 40) srcBucket = 'unknown';
+    if (!byRepSrcs[rep]) byRepSrcs[rep] = {};
+    byRepSrcs[rep][srcBucket] = (byRepSrcs[rep][srcBucket] || 0) + 1;
+
+    // ── Referral detection: team member's name in UTM ──
+    const allUtm = (rawSrc + ' ' + rawMed).toLowerCase();
+    const repFirst = rep.toLowerCase().split(' ')[0];
+    teamFirstNames.forEach(name => {
+      if (name !== repFirst && allUtm.includes(name)) {
+        const key = name + '->' + rep;
+        if (!refMap[key]) refMap[key] = { from: name, to: rep, count: 0, cancelled: 0 };
+        refMap[key].count++;
+        if (isCancelled) refMap[key].cancelled++;
+      }
+    });
+
+    if (startCol && row[startCol]) {
+      const d = new Date(row[startCol]);
+      if (!isNaN(d)) {
+        if (!minDate || d < minDate) minDate = d;
+        if (!maxDate || d > maxDate) maxDate = d;
+        const ds = d.toISOString().slice(0, 10);
+        if (!byDay[ds]) byDay[ds] = {};
+        if (!byDay[ds][rep]) byDay[ds][rep] = { total: 0, active: 0, cancelled: 0 };
+        byDay[ds][rep].total++;
+        if (isCancelled) byDay[ds][rep].cancelled++;
+        else byDay[ds][rep].active++;
+      }
+    }
+  });
+
+  // Compute follow-ups (same invitee, 2+ active) and rescheduled (cancelled + active)
+  const followUps = {}, rescheduled = {};
+  Object.entries(invByRep).forEach(([rep, invitees]) => {
+    let fu = 0, rs = 0;
+    Object.values(invitees).forEach(inv => {
+      if (inv.active >= 2) fu++;
+      if (inv.active >= 1 && inv.cancelled >= 1) rs++;
+    });
+    if (fu) followUps[rep] = fu;
+    if (rs) rescheduled[rep] = rs;
+  });
+
+  return { byRep, byDay, followUps, rescheduled, notices, minDate, maxDate,
+           utmSources: byRepSrcs,
+           referrals:  Object.values(refMap).sort((a,b) => b.count - a.count) };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Zoom Analysis
+// Handles two Zoom export formats:
+//   "Meeting List Details" — one row per participant (host row has "(Host)" in name)
+//   Simple meetings report  — one row per meeting
+// ═══════════════════════════════════════════════════════════════════
+function analyzeZoom(rawRows) {
+  const notices = [];
+  const headerIdx = findHeaderRow(rawRows, ['host name', 'host email', 'user name', 'meeting id', 'join time', 'duration', 'topic']);
+  const rows = toObjects(rawRows, headerIdx);
+  if (!rows.length) { notices.push('Zoom file appears empty or unrecognized.'); return { byRep: {}, notices }; }
+
+  const sample = rows[0];
+  const keys   = Object.keys(sample);
+
+  // Detect "Meeting List Details" format by presence of a participant name column
+  const partNameCol  = findCol(sample, ['Name (original name)', 'Name (Original Name)']);
+  const isDetailReport = !!partNameCol;
+
+  const hostNameCol  = findCol(sample, ['Host name', 'Host Name', 'Host']);
+  const meetingIdCol = keys.find(k => k.trim() === 'ID') || findCol(sample, ['Meeting ID', 'Meeting Id']);
+  // Note: "Duration (minutes)" appears twice in Meeting List Details headers (col 8 = meeting-level,
+  // col 20 = participant-level). toObjects's header loop overwrites the first with the second,
+  // so findCol returns the participant-level duration — which is exactly what we want.
+  const durationCol  = findCol(sample, ['Duration (minutes)', 'Duration (Minutes)', 'Duration']);
+
+  if (!hostNameCol) notices.push('Zoom: Could not find a host column.');
+  if (!durationCol) notices.push('Zoom: Could not find a duration column — talk time will show 0.');
+
+  function parseMins(raw) {
+    if (!raw) return 0;
+    const s = String(raw).trim();
+    if (s.includes(':')) {
+      const p = s.split(':').map(Number);
+      if (p.length === 3) return p[0] * 60 + p[1] + p[2] / 60;
+      if (p.length === 2) return p[0] * 60 + p[1];
+    }
+    return parseFloat(s) || 0;
+  }
+
+  const acc = {}; // hostName → { meetingIds: Set, totalMinutes }
+
+  if (isDetailReport) {
+    // ── Meeting List Details: only count rows where the participant is the host ──
+    // Zoom marks the host's participant row with "(Host)" in the Name (original name) column.
+    rows.forEach(row => {
+      const partName = (row[partNameCol] || '').trim();
+      if (!partName.toLowerCase().includes('(host)')) return; // skip non-host rows
+
+      const hostName  = hostNameCol ? (row[hostNameCol] || '').trim() : '';
+      const meetingId = meetingIdCol ? (row[meetingIdCol] || '').trim() : '';
+      if (!hostName) return;
+
+      if (!acc[hostName]) acc[hostName] = { meetingIds: new Set(), totalMinutes: 0 };
+      if (meetingId) acc[hostName].meetingIds.add(meetingId);
+      acc[hostName].totalMinutes += parseMins(durationCol ? row[durationCol] : '');
+    });
+  } else {
+    // ── Simple meetings report: one row per meeting ──
+    const SKIP = new Set(['name', 'host name', 'user name', '']);
+    rows.forEach(row => {
+      const hostName  = hostNameCol ? (row[hostNameCol] || '').trim() : '';
+      const meetingId = meetingIdCol ? (row[meetingIdCol] || '').trim() : '';
+      if (!hostName || SKIP.has(hostName.toLowerCase())) return;
+
+      if (!acc[hostName]) acc[hostName] = { meetingIds: new Set(), totalMinutes: 0 };
+      if (meetingId) acc[hostName].meetingIds.add(meetingId);
+      else           acc[hostName].meetingIds.add(hostName + '_' + acc[hostName].meetingIds.size);
+      acc[hostName].totalMinutes += parseMins(durationCol ? row[durationCol] : '');
+    });
+  }
+
+  // Flatten Sets → counts
+  const byRep = {};
+  Object.entries(acc).forEach(([name, d]) => {
+    if (!d.meetingIds.size) return;
+    byRep[name] = { meetings: d.meetingIds.size, totalMinutes: Math.round(d.totalMinutes) };
+  });
+
+  return { byRep, notices, reportType: isDetailReport ? 'detail' : 'meetings' };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// JustCall Analysis
+// ═══════════════════════════════════════════════════════════════════
+function canonicalRepName(name) {
+  // Map a JustCall agent name to the canonical team name used in Calendly/Zoom.
+  // Handles spelling variants like "Steven Russell" → "Steven Russel".
+  const norm = (name || '').toLowerCase().trim();
+  const all  = [...SALES_TEAM, ...PARTNERSHIPS];
+
+  // 1. Exact match
+  const exact = all.find(t => t.toLowerCase() === norm);
+  if (exact) return exact;
+
+  const parts = norm.split(/\s+/);
+
+  // 2. Multi-word: match first name exactly + last names share the same 4-char prefix
+  //    This catches typo variants ("Russell"→"Russel") while rejecting different people
+  //    who share a first name ("Josh Vasseur" ≠ "Josh Naasz").
+  if (parts.length >= 2) {
+    const inFirst = parts[0];
+    const inLast  = parts.slice(1).join(' ');
+    const fuzzy = all.find(t => {
+      const tp = t.toLowerCase().split(/\s+/);
+      if (tp[0] !== inFirst) return false;
+      const tLast = tp.slice(1).join(' ');
+      const minLen = Math.min(inLast.length, tLast.length, 5);
+      return minLen >= 3 && inLast.slice(0, minLen) === tLast.slice(0, minLen);
+    });
+    if (fuzzy) return fuzzy;
+    return name; // different last name = different person
+  }
+
+  // 3. Single word (first-name only): match if it's a known alias
+  if (parts.length === 1 && FIRST_NAME_ALIASES.has(parts[0])) {
+    const firstMatch = all.find(t => t.toLowerCase().split(' ')[0] === parts[0]);
+    if (firstMatch) return firstMatch;
+  }
+
+  return name; // unknown — keep as-is
+}
+
+function analyzeJustCall(rawRows) {
+  const notices = [];
+  const headerIdx = findHeaderRow(rawRows, ['agent name', 'direction', 'status', 'duration']);
+  const rows = toObjects(rawRows, headerIdx);
+  if (!rows.length) { notices.push('JustCall file appears empty or unrecognized.'); return { byRep: {}, notices }; }
+
+  const sample    = rows[0];
+  const agentCol  = findCol(sample, ['Agent Name', 'Agent', 'User Name', 'User']);
+  const statusCol = findCol(sample, ['Status']);
+  const dirCol    = findCol(sample, ['Direction']);
+  const durCol    = findCol(sample, ['Duration (seconds)', 'Handle Time (seconds)', 'Duration']);
+  const dateCol   = findCol(sample, ['Date']);
+
+  if (!agentCol) notices.push('JustCall: Could not find an agent name column.');
+
+  const byRep = {};
+
+  rows.forEach(row => {
+    const rawAgent = (agentCol ? row[agentCol] : '').trim();
+    if (!rawAgent) return;
+    const agent = canonicalRepName(rawAgent);
+
+    if (!byRep[agent]) byRep[agent] = {
+      total: 0, completed: 0, missed: 0,
+      inbound: 0, outbound: 0, totalSeconds: 0,
+    };
+    const r = byRep[agent];
+    r.total++;
+
+    const status = (statusCol ? row[statusCol] : '').trim().toLowerCase();
+    const dir    = (dirCol    ? row[dirCol]    : '').trim().toLowerCase();
+    const dur    = parseInt(durCol ? row[durCol] : '0', 10) || 0;
+
+    if (status === 'completed') { r.completed++; r.totalSeconds += dur; }
+    else r.missed++;
+
+    if (dir === 'inbound')  r.inbound++;
+    else if (dir === 'outbound') r.outbound++;
+  });
+
+  return { byRep, notices };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Merge
+// ═══════════════════════════════════════════════════════════════════
+function mergeData(cResult, zResult, jResult) {
+  const c = cResult.byRep || {};
+  const z = zResult.byRep || {};
+  const j = (jResult || {}).byRep || {};
+
+  const normName = n => n.toLowerCase().replace(/\s+/g, ' ').trim();
+  const cKeys = Object.keys(c);
+  const zKeys = Object.keys(z);
+  const jKeys = Object.keys(j);
+
+  // Build fuzzy name maps: zoom → calendly key, justcall → calendly key
+  const mapToC = (keys) => {
+    const m = {};
+    keys.forEach(k => {
+      const kn = normName(k);
+      let match = cKeys.find(ck => normName(ck) === kn);
+      if (!match) match = cKeys.find(ck => normName(ck).split(' ')[0] === kn.split(' ')[0]);
+      m[k] = match || null;
+    });
+    return m;
+  };
+  const zToC = mapToC(zKeys);
+  const jToC = mapToC(jKeys);
+
+  const allReps = new Set(cKeys);
+  zKeys.forEach(zk => allReps.add(zToC[zk] || zk));
+  jKeys.forEach(jk => allReps.add(jToC[jk] || jk));
+
+  const sorted = Array.from(allReps).map(rep => {
+    const zKey = zKeys.find(zk => zToC[zk] === rep) || (z[rep] ? rep : null);
+    const jKey = jKeys.find(jk => jToC[jk] === rep) || (j[rep] ? rep : null);
+    const total     = c[rep]?.total     || 0;
+    const active    = c[rep]?.active    || 0;
+    const cancelled = c[rep]?.cancelled || 0;
+    const jr = jKey ? j[jKey] : null;
+    return {
+      rep,
+      isTeam:               isTeamMember(rep),
+      isPartnership:        isPartnership(rep),
+      totalAppointments:    total,
+      activeAppointments:   active,
+      cancelledAppointments:cancelled,
+      zoomMeetings: zKey ? z[zKey].meetings    : 0,
+      zoomMinutes:  zKey ? z[zKey].totalMinutes: 0,
+      conversionRate: total > 0 ? Math.round(active / total * 100) : null,
+      followUps:    cResult.followUps?.[rep]   || 0,
+      rescheduled:  cResult.rescheduled?.[rep] || 0,
+      // JustCall
+      jcCalls:      jr ? jr.total        : 0,
+      jcCompleted:  jr ? jr.completed    : 0,
+      jcMissed:     jr ? jr.missed       : 0,
+      jcOutbound:   jr ? jr.outbound     : 0,
+      jcInbound:    jr ? jr.inbound      : 0,
+      jcSeconds:    jr ? jr.totalSeconds : 0,
+    };
+  }).sort((a, b) => {
+    const aOrder = a.isTeam ? 0 : a.isPartnership ? 1 : 2;
+    const bOrder = b.isTeam ? 0 : b.isPartnership ? 1 : 2;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return b.totalAppointments - a.totalAppointments || b.zoomMeetings - a.zoomMeetings;
+  });
+
+  return sorted;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Main Analyze
+// ═══════════════════════════════════════════════════════════════════
+async function analyze() {
+  const btn = document.getElementById('analyze-btn');
+  btn.textContent = '⏳ Analyzing…';
+  btn.disabled = true;
+
+  await new Promise(r => setTimeout(r, 30));
+
+  const cResult = analyzeCalendly(state.calendly);
+  const zResult = analyzeZoom(state.zoom);
+  const jResult = state.justcall ? analyzeJustCall(state.justcall) : { byRep: {}, notices: [] };
+  const merged  = mergeData(cResult, zResult, jResult);
+
+  const allNotices = [...(cResult.notices || []), ...(zResult.notices || []), ...(jResult.notices || [])];
+  document.getElementById('notice-area').innerHTML =
+    allNotices.map(n => `<div class="notice">⚠️ ${n}</div>`).join('');
+
+  // Build week label
+  let weekLabel = '';
+  if (cResult.minDate && cResult.maxDate) {
+    const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    weekLabel = `${fmt(cResult.minDate)} – ${fmt(cResult.maxDate)}`;
+  } else {
+    weekLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  tableData = merged;
+  viewingId = null;
+  hideBanner();
+
+  // After saving, switch to All Time view so new data is immediately visible in context
+  activePeriod = 'all';
+  periodOffset = 0;
+
+  // ── Auto-save to IndexedDB ──
+  if (db) {
+    const totalAppts = merged.reduce((s, r) => s + r.totalAppointments, 0);
+    const totalMins  = merged.reduce((s, r) => s + r.zoomMinutes, 0);
+    const totalZoom  = merged.reduce((s, r) => s + r.zoomMeetings, 0);
+    const totalActive= merged.reduce((s, r) => s + r.activeAppointments, 0);
+
+    await dbAdd({
+      analyzedAt:    new Date().toISOString(),
+      label:         weekLabel,
+      weekLabel,
+      calendlyFile:  state.calendlyName   || 'calendly.csv',
+      zoomFile:      state.zoomName       || 'zoom.csv',
+      justcallFile:  state.justcallName   || null,
+      tableData:     merged,
+      repCount:      merged.length,
+      totalAppts,
+      totalActive,
+      totalZoom,
+      totalMins,
+      dataFrom:      cResult.minDate ? cResult.minDate.toISOString() : null,
+      dataTo:        cResult.maxDate ? cResult.maxDate.toISOString() : null,
+      dayData:       cResult.byDay      || {},
+      utmSources:    cResult.utmSources || {},
+      referrals:     cResult.referrals  || [],
+    });
+
+    await loadHistory();
+
+    // Also update UTM globals immediately with fresh data
+    const utmAgg = aggregateUtmData(await dbGetAll());
+    currentUtmSources = utmAgg.sources;
+    currentReferrals  = utmAgg.referrals;
+  }
+
+  // Render the All Time view so new data is immediately included
+  document.getElementById('results').style.display = 'block';
+  await loadPeriodData();
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  btn.textContent = '⚡ Analyze Reports';
+  btn.disabled = false;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Formatters
+// ═══════════════════════════════════════════════════════════════════
+function fmtTime(minutes) {
+  if (!minutes) return '—';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h)      return `${h}h`;
+  return `${m}m`;
+}
+function pct(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; }
+
+// ═══════════════════════════════════════════════════════════════════
+// Render: Team Summary
+// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// Render: Insights Banner
+// ═══════════════════════════════════════════════════════════════════
+function renderInsights(data, prev) {
+  const el = document.getElementById('insights-section');
+  if (!el) return;
+  // Core sales team only (excludes partnerships like Stefan)
+  const team = data.filter(r => r.isTeam && !r.isPartnership);
+  const partnerships = data.filter(r => r.isPartnership);
+  if (!team.length && !partnerships.length) { el.innerHTML = ''; return; }
+  if (!team.length) { el.innerHTML = ''; return; } // no team data — insights require team members
+
+  const totalAppts  = team.reduce((s,r) => s + r.totalAppointments, 0);
+  const totalMins   = team.reduce((s,r) => s + r.zoomMinutes, 0);
+  const totalZoom   = team.reduce((s,r) => s + r.zoomMeetings, 0);
+  const prevTeam    = (prev || []).filter(r => r.isTeam && !r.isPartnership);
+  const prevAppts   = prevTeam.reduce((s,r) => s + r.totalAppointments, 0);
+  const prevMins    = prevTeam.reduce((s,r) => s + r.zoomMinutes, 0);
+
+  // JustCall aggregates
+  const totalJcCalls     = team.reduce((s,r) => s + (r.jcCalls     || 0), 0);
+  const totalJcCompleted = team.reduce((s,r) => s + (r.jcCompleted || 0), 0);
+  const totalJcSeconds   = team.reduce((s,r) => s + (r.jcSeconds   || 0), 0);
+  const hasJustCall      = totalJcCalls > 0;
+  const prevJcCalls      = prevTeam.reduce((s,r) => s + (r.jcCalls     || 0), 0);
+  const prevJcCompleted  = prevTeam.reduce((s,r) => s + (r.jcCompleted || 0), 0);
+
+  // Top performer: score = appointments (primary) + jcCompleted bonus (secondary tiebreak)
+  const topRep = [...team].sort((a,b) => {
+    if (b.totalAppointments !== a.totalAppointments) return b.totalAppointments - a.totalAppointments;
+    return (b.jcCompleted||0) - (a.jcCompleted||0);
+  })[0];
+  const topPhoto = repPhoto(topRep.rep);
+  const topAvatar = topPhoto
+    ? `<img src="${topPhoto}" class="insight-performer-photo" alt="${topRep.rep}">`
+    : `<div class="insight-performer-initials">${topRep.rep.split(' ').map(n=>n[0]).join('')}</div>`;
+  const topConv = topRep.conversionRate ?? (topRep.totalAppointments > 0 ? Math.round(topRep.activeAppointments/topRep.totalAppointments*100) : null);
+
+  // Trend: appointments
+  const apptDiff = prevAppts ? totalAppts - prevAppts : null;
+  const apptPct  = prevAppts ? Math.round(Math.abs(apptDiff)/prevAppts*100) : null;
+  const trendCls = apptDiff === null ? 'neutral' : apptDiff >= 0 ? 'up' : 'down';
+  const trendTxt = apptDiff === null ? 'No prior data'
+    : `${apptDiff >= 0 ? '↑' : '↓'} ${Math.abs(apptDiff)} appts (${apptPct}%) vs last period`;
+
+  // Talk time trend (Zoom)
+  const minsDiff = prevMins ? totalMins - prevMins : null;
+  const minsTrendCls = minsDiff === null ? 'neutral' : minsDiff >= 0 ? 'up' : 'down';
+  const minsTrendTxt = minsDiff === null ? 'No prior data'
+    : `${minsDiff >= 0 ? '↑' : '↓'} ${fmtTime(Math.abs(minsDiff))} vs last period`;
+
+  // JustCall phone activity trend
+  const jcDiff    = prevJcCalls ? totalJcCalls - prevJcCalls : null;
+  const jcPct     = prevJcCalls ? Math.round(Math.abs(jcDiff)/prevJcCalls*100) : null;
+  const jcTrendCls = jcDiff === null ? 'neutral' : jcDiff >= 0 ? 'up' : 'down';
+  const jcTrendTxt = jcDiff === null ? 'No prior data'
+    : `${jcDiff >= 0 ? '↑' : '↓'} ${Math.abs(jcDiff)} calls (${jcPct}%) vs last period`;
+  const jcAnswerRate = totalJcCalls > 0 ? Math.round(totalJcCompleted/totalJcCalls*100) : 0;
+  const jcCallMins   = Math.round(totalJcSeconds / 60);
+
+  // Top caller (most completed JustCall calls)
+  const topCaller = hasJustCall
+    ? [...team].filter(r => (r.jcCalls||0) > 0).sort((a,b) => (b.jcCompleted||0) - (a.jcCompleted||0))[0]
+    : null;
+
+  // Best conversion (min 5 appts)
+  const convLeader = [...team].filter(r => r.totalAppointments >= 5)
+    .sort((a,b) => {
+      const ac = a.conversionRate ?? (a.totalAppointments>0?Math.round(a.activeAppointments/a.totalAppointments*100):0);
+      const bc = b.conversionRate ?? (b.totalAppointments>0?Math.round(b.activeAppointments/b.totalAppointments*100):0);
+      return bc - ac;
+    })[0];
+  const convPhoto  = convLeader ? repPhoto(convLeader.rep) : null;
+  const convRate   = convLeader ? (convLeader.conversionRate ?? Math.round(convLeader.activeAppointments/convLeader.totalAppointments*100)) : null;
+
+  // Attention flags — include JustCall when team has data
+  const flagged = team.filter(r => {
+    if (r.totalAppointments === 0) return true;
+    if (r.totalAppointments > 0 && r.cancelledAppointments/r.totalAppointments > 0.4) return true;
+    if (activePeriod !== 'week' && activePeriod !== 'day' && r.zoomMeetings === 0 && r.totalAppointments > 5) return true;
+    if (hasJustCall && (r.jcCalls||0) === 0) return true;
+    return false;
+  });
+
+  // Period label
+  const periodLbl = document.getElementById('period-label-display')?.textContent || '—';
+
+  el.innerHTML = `
+    <div class="insights-banner">
+      <div class="insights-header">
+        <div class="insights-header-left">
+          <h2>📊 Performance Insights</h2>
+        </div>
+        <span class="insights-period-badge">${periodLbl}</span>
+      </div>
+      <div class="insights-cards${hasJustCall ? ' has-justcall' : ''}">
+
+        <!-- Top Performer -->
+        <div class="insight-card">
+          <div>
+            <div class="insight-label">🏆 Top Performer</div>
+            <div class="insight-top-performer" style="margin-top:10px">
+              ${topAvatar}
+              <div>
+                <div class="insight-value large">${topRep.rep.split(' ')[0]}</div>
+                <div class="insight-sub">${topRep.totalAppointments} appts${topConv !== null ? ' · ' + topConv + '% conv.' : ''}${hasJustCall && topRep.jcCompleted ? ' · ' + topRep.jcCompleted + ' calls' : ''}</div>
+              </div>
+            </div>
+          </div>
+          <span class="insight-trend up">🥇 #1 this period</span>
+        </div>
+
+        <!-- Team Appointments Trend -->
+        <div class="insight-card">
+          <div>
+            <div class="insight-label">📅 Appointments</div>
+            <div class="insight-value" style="margin-top:10px">${totalAppts}</div>
+            <div class="insight-sub">Total team bookings</div>
+          </div>
+          <span class="insight-trend ${trendCls}">${trendTxt}</span>
+        </div>
+
+        <!-- Talk Time (Zoom) -->
+        <div class="insight-card">
+          <div>
+            <div class="insight-label">⏱ Talk Time</div>
+            <div class="insight-value" style="margin-top:10px">${fmtTime(totalMins)}</div>
+            <div class="insight-sub">${totalZoom} Zoom calls hosted${hasJustCall ? ` · +${fmtTime(jcCallMins)} phone` : ''}</div>
+          </div>
+          <span class="insight-trend ${minsTrendCls}">${minsTrendTxt}</span>
+        </div>
+
+        <!-- Phone Calls (JustCall) — only shown when data exists -->
+        ${hasJustCall ? `
+        <div class="insight-card">
+          <div>
+            <div class="insight-label">📞 Phone Calls</div>
+            <div class="insight-value" style="margin-top:10px">${totalJcCalls}</div>
+            <div class="insight-sub">${totalJcCompleted} answered · ${jcAnswerRate}% rate${topCaller ? ` · ${topCaller.rep.split(' ')[0]} leads` : ''}</div>
+          </div>
+          <span class="insight-trend ${jcTrendCls}">${jcTrendTxt}</span>
+        </div>
+        ` : ''}
+
+        <!-- Best Conversion -->
+        <div class="insight-card">
+          <div>
+            <div class="insight-label">🎯 Best Conversion</div>
+            ${convLeader ? `
+            <div class="insight-top-performer" style="margin-top:10px">
+              ${convPhoto ? `<img src="${convPhoto}" class="insight-performer-photo" style="width:36px;height:36px" alt="">` : `<div class="insight-performer-initials" style="width:36px;height:36px;font-size:12px">${convLeader.rep.split(' ').map(n=>n[0]).join('')}</div>`}
+              <div>
+                <div class="insight-value">${convLeader.rep.split(' ')[0]}</div>
+                <div class="insight-sub">${convLeader.activeAppointments} of ${convLeader.totalAppointments} confirmed</div>
+              </div>
+            </div>
+            <span class="insight-trend up" style="margin-top:8px">${convRate}% conversion rate</span>
+            ` : '<div class="insight-sub" style="margin-top:10px">Need ≥5 appts to rank</div>'}
+          </div>
+        </div>
+
+        <!-- Needs Attention -->
+        <div class="insight-card">
+          <div>
+            <div class="insight-label">⚠️ Needs Attention</div>
+            ${flagged.length ? `
+            <div class="insight-alert-list" style="margin-top:10px">
+              ${flagged.slice(0,4).map(r => {
+                const whyParts = [];
+                if (r.totalAppointments === 0) whyParts.push('No activity');
+                else {
+                  if (r.cancelledAppointments/r.totalAppointments > 0.4) whyParts.push('High cancellations');
+                  if (activePeriod !== 'week' && activePeriod !== 'day' && r.zoomMeetings === 0 && r.totalAppointments > 5) whyParts.push('No Zoom');
+                  if (hasJustCall && (r.jcCalls||0) === 0) whyParts.push('No calls');
+                }
+                return `<div class="insight-alert-item"><strong>${r.rep.split(' ')[0]}</strong> — ${whyParts.join(', ') || 'Review needed'}</div>`;
+              }).join('')}
+            </div>
+            <span class="insight-trend down" style="margin-top:8px">${flagged.length} rep${flagged.length>1?'s':''} flagged</span>
+            ` : `<div style="margin-top:10px"><div class="insight-value" style="color:#4ade80">✓</div><div class="insight-sub">All reps on track</div></div>`}
+          </div>
+        </div>
+
+      </div>
+    </div>`;
+}
+
+function renderTeamSummary(data, prev) {
+  const team        = data.filter(r => r.isTeam && !r.isPartnership);
+  const totalAppts  = team.reduce((s, r) => s + r.totalAppointments, 0);
+  const totalActive = team.reduce((s, r) => s + r.activeAppointments, 0);
+  const totalZoom   = team.reduce((s, r) => s + r.zoomMeetings, 0);
+  const totalMins   = team.reduce((s, r) => s + r.zoomMinutes, 0);
+  const others      = data.filter(r => !r.isTeam && !r.isPartnership).length;
+
+  const prevTeam      = (prev || []).filter(r => r.isTeam && !r.isPartnership);
+  const prevAppts     = prevTeam.reduce((s, r) => s + r.totalAppointments, 0);
+  const prevActive    = prevTeam.reduce((s, r) => s + r.activeAppointments, 0);
+  const prevZoom      = prevTeam.reduce((s, r) => s + r.zoomMeetings, 0);
+  const prevMins      = prevTeam.reduce((s, r) => s + r.zoomMinutes, 0);
+
+  function wowBadge(curr, p, fmt) {
+    if (!prev?.length) return '';
+    const diff = curr - p;
+    if (diff === 0) return '<div class="stat-delta zero">→ Same as last period</div>';
+    const cls  = diff > 0 ? 'up' : 'down';
+    const sign = diff > 0 ? '+' : '';
+    const label = fmt ? fmt(diff) : `${sign}${diff}`;
+    return `<div class="stat-delta ${cls}">${diff > 0 ? '↑' : '↓'} ${label} vs last period</div>`;
+  }
+
+  document.getElementById('team-summary').innerHTML = `
+    <div class="stat-box blue">
+      <div class="label">Total Appointments</div>
+      <div class="value">${totalAppts}</div>
+      <div class="sub">${team.length} sales reps</div>
+      ${wowBadge(totalAppts, prevAppts)}
+    </div>
+    <div class="stat-box green">
+      <div class="label">Active / Confirmed</div>
+      <div class="value">${totalActive}</div>
+      <div class="sub">${pct(totalActive, totalAppts)} confirmed rate</div>
+      ${wowBadge(totalActive, prevActive)}
+    </div>
+    <div class="stat-box violet">
+      <div class="label">Zoom Calls</div>
+      <div class="value">${totalZoom}</div>
+      <div class="sub">Hosted by sales team</div>
+      ${wowBadge(totalZoom, prevZoom)}
+    </div>
+    <div class="stat-box amber">
+      <div class="label">Total Talk Time</div>
+      <div class="value">${fmtTime(totalMins)}</div>
+      <div class="sub">${others > 0 ? `+${others} others not shown` : `${totalMins} total minutes`}</div>
+      ${wowBadge(totalMins, prevMins, d => (d>0?'+':'') + fmtTime(Math.abs(d)))}
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Render: Per-Rep Cards
+// ═══════════════════════════════════════════════════════════════════
+function repCardHTML(r, colorIdx, isPartnerCard) {
+  const colors = ['#2491EB','#1B70BB','#38B6FF','#104378','#145593','#165EA0','#85C4F5','#0b2043'];
+  // Partnership cards get a distinct teal/slate accent
+  const color  = isPartnerCard ? '#0f766e' : colors[colorIdx % colors.length];
+  const photo  = repPhoto(r.rep);
+  const avatar = photo
+    ? `<img src="${photo}" alt="${r.rep}" class="rep-avatar">`
+    : `<div class="rep-avatar rep-avatar-initials" style="background:${color}">${r.rep.split(' ').map(n=>n[0]).join('')}</div>`;
+
+  // No rank badge — reps handle different types of deals
+
+  // WoW delta helper
+  const prev = prevTableData.find(p => p.rep === r.rep);
+  function d(curr, key, fmt) {
+    if (!prev) return '';
+    const diff = curr - (prev[key] || 0);
+    if (diff === 0) return '';
+    const cls  = diff > 0 ? 'delta-up' : 'delta-down';
+    const sign = diff > 0 ? '+' : '';
+    const val  = fmt ? fmt(Math.abs(diff)) : Math.abs(diff);
+    return ` <span class="delta ${cls}">${diff > 0 ? '↑' : '↓'} ${sign}${fmt ? fmt(diff) : diff}</span>`;
+  }
+
+  // Conversion rate bar (compute from base fields if not pre-calculated)
+  const conv = r.conversionRate ?? (r.totalAppointments > 0 ? Math.round(r.activeAppointments / r.totalAppointments * 100) : null);
+  const convBarCls = conv >= 70 ? 'good' : conv < 50 ? 'warn' : '';
+  const convBar = conv !== null
+    ? `<div class="conversion-bar">
+         <div class="conversion-track"><div class="conversion-fill ${convBarCls}" style="width:${conv}%"></div></div>
+         <span style="font-size:12px;font-weight:700;color:#0f172a;min-width:34px;text-align:right">${conv}%</span>
+       </div>`
+    : '—';
+
+  // Attention flags
+  const flagDefs = {
+    'No appointments this period': 'This rep had zero Calendly bookings in the selected period.',
+    'High cancellation rate':      'More than 40% of this rep\'s appointments were cancelled. Worth a check-in.',
+    'No Zoom activity':            'This rep had 5+ appointments but no recorded Zoom meetings — may indicate calls happening outside Zoom.',
+  };
+  const flags = [];
+  if (r.totalAppointments === 0)                                                        flags.push('No appointments this period');
+  if (r.totalAppointments > 0 && r.cancelledAppointments / r.totalAppointments > 0.4)  flags.push('High cancellation rate');
+  // Only flag missing Zoom when the view can actually show Zoom data (week/day views use dayData which has no Zoom)
+  if (r.zoomMeetings === 0 && r.totalAppointments > 5 && activePeriod !== 'week' && activePeriod !== 'day') flags.push('No Zoom activity');
+  const attentionHTML = flags.length
+    ? `<div class="attention-strip">⚠️ ${flags[0]} <i class="tip" style="background:rgba(185,28,28,0.15);color:#b91c1c" data-tip="${flagDefs[flags[0]]}">?</i></div>` : '';
+
+  // Repeat meetings row
+  const repeatParts = [];
+  if (r.followUps)   repeatParts.push(`<span class="repeat-tag">${r.followUps} follow-up${r.followUps > 1 ? 's' : ''}</span>`);
+  if (r.rescheduled) repeatParts.push(`<span class="repeat-tag orange">${r.rescheduled} rescheduled</span>`);
+  const repeatHTML = repeatParts.length ? `<div class="repeat-row">${repeatParts.join('')}</div>` : '';
+
+  const jcHTML = r.jcCalls > 0 ? `
+    <div class="rep-stat"><span class="key">Calls</span><span class="val">${r.jcCalls}${d(r.jcCalls,'jcCalls')} <span style="font-size:10px;color:#94a3b8">${r.jcOutbound}↑ ${r.jcInbound}↓</span></span></div>
+    <div class="rep-stat"><span class="key">Answered</span><span class="val">${r.jcCompleted} <span style="font-size:11px;font-weight:700;color:${r.jcCalls>0&&r.jcCompleted/r.jcCalls>=0.6?'#16a34a':r.jcCompleted/r.jcCalls<0.4?'#dc2626':'#d97706'}">${r.jcCalls>0?Math.round(r.jcCompleted/r.jcCalls*100):'—'}%</span></span></div>
+    <div class="rep-stat"><span class="key">Call Time</span><span class="val">${fmtTime(Math.round(r.jcSeconds/60))}</span></div>
+    <div class="rep-stat"><span class="key">Avg / Call</span><span class="val">${r.jcCompleted ? fmtTime(Math.round(r.jcSeconds/r.jcCompleted/60)) : '—'}</span></div>
+  ` : '';
+
+  // ── Horizontal layout for partnership cards ──
+  if (isPartnerCard) {
+    return `
+    <div class="rep-card" style="border-top-color:${color}">
+      <div class="pcard-left">
+        <div class="rep-card-header" style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #f1f5f9">
+          ${avatar}<h3>${r.rep}</h3>
+        </div>
+        <div class="rep-stat"><span class="key">Appointments</span><span class="val highlight">${r.totalAppointments}${d(r.totalAppointments,'totalAppointments')}</span></div>
+        <div class="rep-stat"><span class="key">Conversion <i class="tip" data-tip="% of total appointments that were confirmed and not cancelled.">?</i></span><span class="val" style="flex:1;padding-left:6px">${convBar}</span></div>
+        <div class="rep-stat"><span class="key">Cancelled</span><span class="val">${r.cancelledAppointments || '—'}${d(r.cancelledAppointments,'cancelledAppointments')}</span></div>
+        ${repeatHTML}
+        ${attentionHTML}
+      </div>
+      <div class="pcard-right">
+        <div class="pcard-section-label">📹 Zoom</div>
+        <div class="rep-stat"><span class="key">Meetings</span><span class="val">${r.zoomMeetings || '—'}${d(r.zoomMeetings,'zoomMeetings')}</span></div>
+        <div class="rep-stat"><span class="key">Talk Time</span><span class="val">${fmtTime(r.zoomMinutes)}${d(r.zoomMinutes,'zoomMinutes',m=>fmtTime(Math.abs(m)))}</span></div>
+        <div class="rep-stat"><span class="key">Avg / Meeting</span><span class="val">${r.zoomMeetings ? fmtTime(Math.round(r.zoomMinutes / r.zoomMeetings)) : '—'}</span></div>
+        ${r.jcCalls > 0 ? `
+        <div class="pcard-divider"></div>
+        <div class="pcard-section-label">📞 JustCall</div>
+        <div class="rep-stat"><span class="key">Calls</span><span class="val">${r.jcCalls}${d(r.jcCalls,'jcCalls')} <span style="font-size:10px;color:#94a3b8">${r.jcOutbound}↑ ${r.jcInbound}↓</span></span></div>
+        <div class="rep-stat"><span class="key">Answered</span><span class="val">${r.jcCompleted} <span style="font-size:11px;font-weight:700;color:${r.jcCalls>0&&r.jcCompleted/r.jcCalls>=0.6?'#16a34a':r.jcCompleted/r.jcCalls<0.4?'#dc2626':'#d97706'}">${Math.round(r.jcCompleted/r.jcCalls*100)}%</span></span></div>
+        <div class="rep-stat"><span class="key">Call Time</span><span class="val">${fmtTime(Math.round(r.jcSeconds/60))}</span></div>
+        <div class="rep-stat"><span class="key">Avg / Call</span><span class="val">${r.jcCompleted ? fmtTime(Math.round(r.jcSeconds/r.jcCompleted/60)) : '—'}</span></div>
+        ` : ''}
+      </div>
+    </div>`;
+  }
+
+  // ── Standard vertical layout for sales team cards ──
+  return `
+    <div class="rep-card" style="border-top-color:${color}">
+      <div class="rep-card-header">
+        ${avatar}
+        <h3>${r.rep}</h3>
+      </div>
+      <div class="rep-stat"><span class="key">Appointments</span><span class="val highlight">${r.totalAppointments}${d(r.totalAppointments,'totalAppointments')}</span></div>
+      <div class="rep-stat"><span class="key">Conversion <i class="tip" data-tip="% of total appointments that were confirmed and not cancelled. Higher is better — e.g. 86% means 86 out of 100 bookings went ahead.">?</i></span><span class="val" style="flex:1;padding-left:8px">${convBar}</span></div>
+      <div class="rep-stat"><span class="key">Cancelled</span><span class="val">${r.cancelledAppointments || '—'}${d(r.cancelledAppointments,'cancelledAppointments')}</span></div>
+      ${repeatHTML}
+      <div class="rep-stat" style="margin-top:${repeatParts.length?'6px':'0'}"><span class="key">Zoom Meetings</span><span class="val">${r.zoomMeetings || '—'}${d(r.zoomMeetings,'zoomMeetings')}</span></div>
+      <div class="rep-stat"><span class="key">Talk Time</span><span class="val">${fmtTime(r.zoomMinutes)}${d(r.zoomMinutes,'zoomMinutes',m=>fmtTime(Math.abs(m)))}</span></div>
+      <div class="rep-stat"><span class="key">Avg / Meeting</span><span class="val">${r.zoomMeetings ? fmtTime(Math.round(r.zoomMinutes / r.zoomMeetings)) : '—'}</span></div>
+      ${r.jcCalls > 0 ? `
+      <div style="border-top:1px solid #f1f5f9;margin:10px 0 6px;"></div>
+      <div class="rep-stat"><span class="key" style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.5px">📞 JustCall</span></div>
+      ${jcHTML}
+      ` : ''}
+      ${attentionHTML}
+    </div>`;
+}
+
+function renderRepCards(data) {
+  // Always use the live isPartnership() function as the source of truth
+  // (old saved records may have isPartnership: undefined but isTeam: true for Stefan)
+  const team         = data.filter(r => (r.isTeam || isTeamMember(r.rep)) && !isPartnership(r.rep));
+  const partnerships = data.filter(r => isPartnership(r.rep));
+  const others       = data.filter(r => !isTeamMember(r.rep) && !isPartnership(r.rep));
+
+  document.getElementById('rep-grid').innerHTML =
+    team.map((r, i) => repCardHTML(r, i)).join('');
+
+  const partnerSection = document.getElementById('partnership-section');
+  if (partnerships.length) {
+    partnerSection.style.display = 'block';
+    document.getElementById('partnership-grid').innerHTML =
+      partnerships.map((r, i) => repCardHTML(r, i, true)).join('');
+  } else {
+    partnerSection.style.display = 'none';
+  }
+
+  const otherSection = document.getElementById('other-reps-section');
+  if (others.length) {
+    otherSection.style.display = 'block';
+    document.getElementById('other-reps-label').textContent =
+      `▶ Show ${others.length} other participant${others.length > 1 ? 's' : ''} from Zoom`;
+    document.getElementById('other-rep-grid').innerHTML =
+      others.map((r, i) => repCardHTML(r, i)).join('');
+  } else {
+    otherSection.style.display = 'none';
+  }
+}
+
+let otherRepsOpen = false;
+function toggleOtherReps() {
+  otherRepsOpen = !otherRepsOpen;
+  const grid  = document.getElementById('other-rep-grid');
+  const label = document.getElementById('other-reps-label');
+  const count = document.getElementById('other-rep-grid').children.length;
+  grid.style.display = otherRepsOpen ? 'grid' : 'none';
+  label.textContent  = otherRepsOpen
+    ? `▼ Hide other participants`
+    : `▶ Show ${count} other participant${count > 1 ? 's' : ''} from Zoom`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Render: Charts
+// ═══════════════════════════════════════════════════════════════════
+// ── Source tooltip helpers ──
+function showOtherTip(el) {
+  try {
+    const srcs = JSON.parse(el.dataset.srcs || '[]');
+    const tip  = document.getElementById('src-tip');
+    tip.innerHTML =
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8;margin-bottom:6px;">Other contains</div>'
+      + srcs.map(([s, c]) =>
+          `<div style="display:flex;justify-content:space-between;gap:20px;">
+             <span style="color:#e2e8f0">${escHtml(s || '(unknown)')}</span>
+             <span style="color:#94a3b8;font-weight:600">${c}</span>
+           </div>`
+        ).join('');
+    tip.style.display = 'block';
+    const rect = el.getBoundingClientRect();
+    const tipW = tip.offsetWidth;
+    const tipH = tip.offsetHeight;
+    let left = rect.left + rect.width / 2 - tipW / 2;
+    let top  = rect.top  - tipH - 8;
+    if (left + tipW > window.innerWidth - 8) left = window.innerWidth - tipW - 8;
+    if (left < 8) left = 8;
+    if (top < 8) top = rect.bottom + 8;
+    tip.style.left = left + 'px';
+    tip.style.top  = top  + 'px';
+  } catch(e) {}
+}
+function hideOtherTip() {
+  document.getElementById('src-tip').style.display = 'none';
+}
+
+// ── Source bucket helpers ──
+function classifySource(src) {
+  const s = (src || '').toLowerCase();
+  if (!s || s === 'unknown') return 'other';
+  if (s === 'portal')                                      return 'portal';
+  if (s.includes('linkedin'))                              return 'linkedin';
+  if (s === 'qr')                                          return 'qr';
+  if (['aahoacon','conference','event'].some(k=>s.includes(k))) return 'conference';
+  // referral if it matches a team name
+  const teamFirst = [...SALES_TEAM,...PARTNERSHIPS].map(n=>n.split(' ')[0].toLowerCase());
+  if (teamFirst.some(n => s.includes(n)))                  return 'referral';
+  return 'other';
+}
+const SOURCE_COLORS = { portal:'#2491EB', conference:'#f59e0b', referral:'#22c55e', linkedin:'#6366f1', qr:'#a855f7', other:'#94a3b8' };
+const SOURCE_LABELS = { portal:'Portal', conference:'Conference', referral:'Referral', linkedin:'LinkedIn', qr:'QR Code', other:'Other' };
+
+function renderReferrals(referrals) {
+  const sec = document.getElementById('referral-section');
+  const relevant = referrals.filter(r => r.count >= 2); // skip noise
+  if (!relevant.length) { sec.style.display = 'none'; return; }
+
+  sec.style.display = 'block';
+  sec.innerHTML = `
+    <div class="section-title">Referral Activity</div>
+    <div class="referral-grid">
+      ${relevant.map(r => {
+        const fromName = r.from.charAt(0).toUpperCase() + r.from.slice(1);
+        const confirmed = r.count - r.cancelled;
+        const rate = r.count > 0 ? Math.round(confirmed / r.count * 100) : 0;
+        const rateCls = rate >= 60 ? 'good' : rate >= 40 ? 'mid' : 'poor';
+        // Find photos
+        const fromPhoto = repPhoto(fromName) || repPhoto(fromName + ' Street') || null;
+        const toPhoto   = repPhoto(r.to) || null;
+        const fromAv = fromPhoto
+          ? `<img src="${fromPhoto}" class="ref-avatar" alt="${fromName}">`
+          : `<div class="ref-initials">${fromName.charAt(0).toUpperCase()}</div>`;
+        const toAv = toPhoto
+          ? `<img src="${toPhoto}" class="ref-avatar" alt="${r.to}">`
+          : `<div class="ref-initials">${r.to.charAt(0).toUpperCase()}</div>`;
+        return `
+          <div class="referral-card">
+            <div class="ref-person">${fromAv}<div class="ref-name">${fromName}</div></div>
+            <div class="ref-arrow">→</div>
+            <div class="ref-person">${toAv}<div class="ref-name">${r.to.split(' ')[0]}</div></div>
+            <div class="ref-stats">
+              <div class="ref-count">${r.count}</div>
+              <div class="ref-label">referrals</div>
+              <div class="ref-rate ${rateCls}">${rate}% confirmed</div>
+            </div>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderSourceBreakdown(data, utmSources) {
+  const sec = document.getElementById('source-section');
+  const teamReps = data.filter(r => r.isTeam || r.isPartnership);
+  const hasData  = teamReps.some(r => {
+    const srcs = utmSources[r.rep] || {};
+    return Object.values(srcs).some(v => v > 0);
+  });
+  if (!hasData) { sec.style.display = 'none'; return; }
+
+  sec.style.display = 'block';
+  sec.innerHTML = `
+    <div class="section-title">Lead Sources</div>
+    <div class="source-grid">
+      ${teamReps.map(r => {
+        const srcs = utmSources[r.rep] || {};
+        if (!Object.keys(srcs).length) return '';
+        // Bucket and sort, also track raw sources per bucket
+        const bucketed    = {};
+        const bucketedRaw = {}; // { bucket: [[src, cnt], ...] }
+        Object.entries(srcs).forEach(([src, cnt]) => {
+          const cls = classifySource(src);
+          bucketed[cls] = (bucketed[cls] || 0) + cnt;
+          if (!bucketedRaw[cls]) bucketedRaw[cls] = {};
+          bucketedRaw[cls][src] = (bucketedRaw[cls][src] || 0) + cnt;
+        });
+        const sorted = Object.entries(bucketed).sort((a,b)=>b[1]-a[1]).filter(([k])=>k!=='other' || bucketed['other']>2);
+        const maxCount = sorted[0]?.[1] || 1;
+        const photo = repPhoto(r.rep);
+
+        // Build tooltip data for "other" bucket
+        const otherRaw = bucketedRaw['other'] || {};
+        const otherTip = JSON.stringify(
+          Object.entries(otherRaw).sort((a,b)=>b[1]-a[1]).slice(0,10)
+        ).replace(/"/g, '&quot;');
+
+        return `
+          <div class="source-card">
+            <div class="source-card-name">
+              ${photo ? `<img src="${photo}" alt="${r.rep}">` : ''}
+              ${r.rep.split(' ')[0]}
+            </div>
+            ${sorted.slice(0,5).map(([cls, cnt]) => `
+              <div class="source-bar-row">
+                <div class="source-bar-label">
+                  ${SOURCE_LABELS[cls]}${cls === 'other' ? ` <span class="src-q-icon" onmouseenter="showOtherTip(this)" onmouseleave="hideOtherTip()" data-srcs="${otherTip}">?</span>` : ''}
+                </div>
+                <div class="source-bar-track">
+                  <div class="source-bar-fill" style="width:${Math.round(cnt/maxCount*100)}%;background:${SOURCE_COLORS[cls]}"></div>
+                </div>
+                <div class="source-bar-count">${cnt}</div>
+              </div>`).join('')}
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderCharts(data) {
+  const team    = data.filter(r => r.isTeam); // charts show sales team only
+  const labels  = team.map(r => r.rep.split(' ')[0]);
+  const brandPalette = ['#2491EB','#1B70BB','#38B6FF','#104378','#145593','#165EA0'];
+  const palette = team.map((_, i) => brandPalette[i % brandPalette.length]);
+  const opts = yLabel => ({
+    responsive: true,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} ${yLabel}` } } },
+    scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } }
+  });
+
+  if (charts.appointments) charts.appointments.destroy();
+  if (charts.zoom)         charts.zoom.destroy();
+
+  charts.appointments = new Chart(document.getElementById('chart-appointments'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: team.map(r => r.totalAppointments), backgroundColor: palette, borderRadius: 6, borderSkipped: false }] },
+    options: opts('appointments'),
+  });
+  charts.zoom = new Chart(document.getElementById('chart-zoom'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: team.map(r => r.zoomMinutes), backgroundColor: palette, borderRadius: 6, borderSkipped: false }] },
+    options: opts('minutes'),
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Render: Table
+// ═══════════════════════════════════════════════════════════════════
+const COLS = [
+  { label: 'Rep Name',        key: 'rep' },
+  { label: 'Appointments',    key: 'totalAppointments' },
+  { label: 'Active',          key: 'activeAppointments' },
+  { label: 'Cancelled',       key: 'cancelledAppointments' },
+  { label: 'Zoom Meetings',   key: 'zoomMeetings' },
+  { label: 'Talk Time (min)', key: 'zoomMinutes' },
+  { label: 'Talk Time',       key: '_fmtTime' },
+  { label: 'Avg / Meeting',   key: '_avgMeeting' },
+];
+
+function renderTable(data) {
+  document.getElementById('table-head').innerHTML = `<tr>${
+    COLS.map((c, i) => `<th onclick="sortTable(${i})">${c.label}<span class="sort-icon"></span></th>`).join('')
+  }</tr>`;
+  renderTableBody();
+}
+
+function renderTableBody() {
+  const colCount = COLS.length;
+  const rows = [];
+  let passedTeam = false;
+
+  tableData.forEach(r => {
+    // Insert a separator row when we cross from team → others
+    if (passedTeam && !r.isTeam) {
+      rows.push(`<tr><td colspan="${colCount}" style="background:#f1f5f9; padding:6px 16px; font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.6px;">Other Participants</td></tr>`);
+      passedTeam = false;
+    }
+    if (r.isTeam) passedTeam = true;
+
+    const avg = r.zoomMeetings ? Math.round(r.zoomMinutes / r.zoomMeetings) : 0;
+    const rowStyle = r.isTeam ? '' : ' style="opacity:0.7"';
+    rows.push(`<tr${rowStyle}>
+      <td><strong>${r.rep}</strong>${r.isTeam ? '' : ' <span style="font-size:10px;color:#94a3b8;font-weight:400">other</span>'}</td>
+      <td><span class="badge badge-blue">${r.totalAppointments || '—'}</span></td>
+      <td><span class="badge badge-green">${r.activeAppointments || '—'}</span></td>
+      <td>${r.cancelledAppointments ? `<span class="badge badge-red">${r.cancelledAppointments}</span>` : '—'}</td>
+      <td><span class="badge badge-violet">${r.zoomMeetings || '—'}</span></td>
+      <td>${r.zoomMinutes || '—'}</td>
+      <td>${fmtTime(r.zoomMinutes)}</td>
+      <td>${avg ? fmtTime(avg) : '—'}</td>
+    </tr>`);
+  });
+
+  document.getElementById('table-body').innerHTML = rows.join('');
+}
+
+function sortTable(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = -1; }
+  tableData.sort((a, b) => {
+    const key = COLS[col].key;
+    let av, bv;
+    if (key === '_fmtTime') { av = a.zoomMinutes; bv = b.zoomMinutes; }
+    else if (key === '_avgMeeting') {
+      av = a.zoomMeetings ? a.zoomMinutes / a.zoomMeetings : 0;
+      bv = b.zoomMeetings ? b.zoomMinutes / b.zoomMeetings : 0;
+    } else { av = a[key]; bv = b[key]; }
+    return typeof av === 'string' ? av.localeCompare(bv) * sortDir : (av - bv) * sortDir;
+  });
+  document.querySelectorAll('#table-head th').forEach((th, i) => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (i === col) th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+  });
+  renderTableBody();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Export CSV
+// ═══════════════════════════════════════════════════════════════════
+function exportCSV() {
+  const headers = ['Rep Name','Total Appointments','Active','Cancelled','Zoom Meetings','Zoom Minutes','Talk Time','Avg Per Meeting'];
+  const rows = tableData.map(r => {
+    const avg = r.zoomMeetings ? Math.round(r.zoomMinutes / r.zoomMeetings) : 0;
+    return [r.rep, r.totalAppointments, r.activeAppointments, r.cancelledAppointments,
+            r.zoomMeetings, r.zoomMinutes, fmtTime(r.zoomMinutes), avg ? fmtTime(avg) : ''];
+  });
+  const csv = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `sales-report-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Bulk Monthly Import
+// Splits a wide-range Calendly CSV by calendar month and pairs each
+// slice with the matching monthly Zoom file already in the served dir.
+// ═══════════════════════════════════════════════════════════════════
+async function bulkImportMonthly(statusEl) {
+  const MONTHS = [
+    { label: 'January 2026',  year: 2026, month: 0, zoomFile: 'zoom-jan-2026.csv' },
+    { label: 'February 2026', year: 2026, month: 1, zoomFile: 'zoom-feb-2026.csv' },
+    { label: 'March 2026',    year: 2026, month: 2, zoomFile: 'zoom-mar-2026.csv' },
+    { label: 'April 2026',    year: 2026, month: 3, zoomFile: 'zoom-apr-2026.csv' },
+  ];
+
+  const setStatus = msg => { if (statusEl) statusEl.textContent = msg; console.log('[bulk]', msg); };
+
+  setStatus('Fetching Calendly Jan–May…');
+  const calText = await fetch('calendly-jan-may-2026.csv').then(r => r.text());
+  const calRaw  = parseCSV(calText);
+
+  // Locate header row + start-date column index
+  const headerIdx = findHeaderRow(calRaw, ['user name', 'invitee', 'event', 'host', 'start']);
+  const headerRow = calRaw[headerIdx] || [];
+  const startDateNames = ['Start Date', 'Event Start', 'Start Time', 'Date'];
+  let startColIdx = -1;
+  for (const cand of startDateNames) {
+    const i = headerRow.findIndex(h => h.trim().toLowerCase().includes(cand.toLowerCase()));
+    if (i !== -1) { startColIdx = i; break; }
+  }
+
+  // Group data rows by year-month
+  const rowsByKey = {};
+  for (let i = headerIdx + 1; i < calRaw.length; i++) {
+    const row = calRaw[i];
+    if (!row || !row.some(c => c)) continue;
+    if (startColIdx >= 0 && row[startColIdx]) {
+      const d = new Date(row[startColIdx]);
+      if (!isNaN(d)) {
+        const key = d.getFullYear() + '-' + d.getMonth();
+        if (!rowsByKey[key]) rowsByKey[key] = [];
+        rowsByKey[key].push(row);
+      }
+    }
+  }
+
+  let imported = 0;
+  for (const m of MONTHS) {
+    const key       = m.year + '-' + m.month;
+    const monthRows = rowsByKey[key] || [];
+    setStatus(`Importing ${m.label} (${monthRows.length} events)…`);
+    if (!monthRows.length) { console.warn('No Calendly rows for', m.label); continue; }
+
+    // Rebuild rawRows for this month: all header rows + filtered data
+    const monthCalRaw = [...calRaw.slice(0, headerIdx + 1), ...monthRows];
+
+    // Fetch corresponding Zoom (skip month gracefully if file missing)
+    const zoomResp = await fetch(m.zoomFile);
+    if (!zoomResp.ok) {
+      setStatus(`⚠️ Zoom file not found for ${m.label} (${m.zoomFile}) — skipping`);
+      console.warn('[bulk] Zoom fetch failed:', m.zoomFile, zoomResp.status);
+      continue;
+    }
+    const zoomText = await zoomResp.text();
+    const zoomRaw  = parseCSV(zoomText);
+
+    // Analyze + merge
+    const cResult = analyzeCalendly(monthCalRaw);
+    const zResult = analyzeZoom(zoomRaw);
+    const merged  = mergeData(cResult, zResult, null); // jResult: no JustCall in bulk import
+
+    const totalAppts  = merged.reduce((s, r) => s + r.totalAppointments, 0);
+    const totalMins   = merged.reduce((s, r) => s + r.zoomMinutes, 0);
+    const totalZoom   = merged.reduce((s, r) => s + r.zoomMeetings, 0);
+    const totalActive = merged.reduce((s, r) => s + r.activeAppointments, 0);
+
+    await dbAdd({
+      analyzedAt:   new Date().toISOString(),
+      label:        m.label,
+      weekLabel:    m.label,
+      calendlyFile: 'calendly-jan-may-2026.csv',
+      zoomFile:     m.zoomFile,
+      tableData:    merged,
+      repCount:     merged.length,
+      totalAppts,
+      totalActive,
+      totalZoom,
+      totalMins,
+      dataFrom:     cResult.minDate ? cResult.minDate.toISOString() : null,
+      dataTo:       cResult.maxDate ? cResult.maxDate.toISOString() : null,
+      dayData:      cResult.byDay      || {},
+      utmSources:   cResult.utmSources || {},
+      referrals:    cResult.referrals  || [],
+    });
+    imported++;
+  }
+
+  setStatus(`✅ ${imported} months imported`);
+  await loadHistory();
+  activePeriod = 'all';
+  periodOffset = 0;
+  await loadPeriodData();
+  return imported;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Boot
+// ═══════════════════════════════════════════════════════════════════
+(async () => {
+  const badge = document.getElementById('db-badge');
+  try {
+    await initDB();
+    badge.textContent = '🗄 IndexedDB ready';
+    cachedRecords = await dbGetAll();
+    await loadHistory();
+    // On startup, show All Time view if there's any saved data
+    if (cachedRecords.length) {
+      activePeriod = 'all';
+      periodOffset = 0;
+      document.getElementById('results').style.display = 'block';
+      await loadPeriodData();
+    }
+  } catch (err) {
+    badge.textContent = '⚠️ DB unavailable';
+    badge.style.background = 'rgba(220,38,38,0.2)';
+    console.warn('IndexedDB init failed:', err);
+  }
+})();
+</script>
+</body>
+</html>
