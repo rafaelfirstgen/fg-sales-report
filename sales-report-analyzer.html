@@ -334,6 +334,41 @@ header p  { font-size: 13px; opacity: 0.75; margin-top: 4px; }
 .rep-stat .val { font-size: 13px; font-weight: 700; color: #1e293b; }
 .rep-stat .val.highlight { color: #2491EB; }
 
+/* ── Goal progress bar ── */
+.goal-bar-wrap { margin: 2px 0 4px; }
+.goal-bar-track { height: 5px; background: #f1f5f9; border-radius: 3px; overflow: hidden; margin-bottom: 3px; }
+.goal-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+.goal-bar-meta { display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; }
+
+/* ── Sparklines ── */
+.sparkline-wrap { display: flex; align-items: flex-end; gap: 6px; margin: 6px 0 2px; }
+.sparkline-label { font-size: 9px; font-weight: 600; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.4px; align-self: center; }
+
+/* ── Section header with action button ── */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.section-header .section-title { margin-bottom: 0; }
+.set-goals-btn { font-size: 11px; font-weight: 600; color: #64748b; background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 5px 12px; cursor: pointer; transition: all 0.15s; }
+.set-goals-btn:hover { background: #f0f7ff; color: #2491EB; border-color: #93c5fd; }
+
+/* ── Goals modal ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.55); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+.modal-box { background: white; border-radius: 16px; padding: 28px; width: 380px; max-width: 92vw; box-shadow: 0 20px 60px rgba(0,0,0,0.18); }
+.modal-box h3 { font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+.modal-desc { font-size: 13px; color: #64748b; margin-bottom: 22px; }
+.goal-input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.goal-input-row .goal-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.goal-initials { width: 30px; height: 30px; border-radius: 50%; background: #2491EB; color: white; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.goal-input-row .goal-name { flex: 1; font-size: 13px; font-weight: 600; color: #0f172a; }
+.goal-input-row input[type=number] { width: 72px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 600; text-align: right; color: #0f172a; }
+.goal-input-row input[type=number]:focus { outline: none; border-color: #2491EB; box-shadow: 0 0 0 3px rgba(36,145,235,0.12); }
+.goal-unit { font-size: 11px; color: #94a3b8; }
+.modal-actions { display: flex; gap: 8px; margin-top: 22px; }
+.modal-btn { flex: 1; padding: 10px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: background 0.15s; }
+.modal-btn.primary { background: #2491EB; color: white; }
+.modal-btn.primary:hover { background: #1B70BB; }
+.modal-btn.secondary { background: #f1f5f9; color: #64748b; }
+.modal-btn.secondary:hover { background: #e2e8f0; }
+
 /* Charts */
 .charts-grid {
   display: grid;
@@ -753,7 +788,10 @@ tbody tr:hover td { background: #f8fafc; }
     <div class="section-title">Team Summary</div>
     <div class="team-summary" id="team-summary"></div>
 
-    <div class="section-title">Sales Team</div>
+    <div class="section-header">
+      <div class="section-title" style="margin-bottom:0">Sales Team</div>
+      <button class="set-goals-btn" onclick="openGoalsModal()">🎯 Set Goals</button>
+    </div>
     <div class="rep-grid" id="rep-grid"></div>
 
     <div id="partnership-section" style="display:none; margin-bottom:32px;">
@@ -2112,6 +2150,82 @@ function fmtTime(minutes) {
 }
 function pct(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; }
 
+// ── Goals (localStorage) ──────────────────────────────────────────
+function getGoals() {
+  try { return JSON.parse(localStorage.getItem('fg_goals') || '{}'); } catch { return {}; }
+}
+function saveGoals(goals) {
+  localStorage.setItem('fg_goals', JSON.stringify(goals));
+}
+
+function openGoalsModal() {
+  const goals   = getGoals();
+  const reps    = SALES_TEAM;
+  const body    = document.getElementById('goals-modal-body');
+  body.innerHTML = reps.map(rep => {
+    const photo = repPhoto(rep);
+    const avatar = photo
+      ? `<img src="${photo}" class="goal-avatar" alt="${rep}">`
+      : `<div class="goal-initials">${rep.split(' ').map(n=>n[0]).join('')}</div>`;
+    return `
+      <div class="goal-input-row">
+        ${avatar}
+        <span class="goal-name">${rep.split(' ')[0]}</span>
+        <input type="number" min="0" max="9999" placeholder="—"
+               value="${goals[rep] || ''}"
+               id="goal-input-${rep.replace(/\s+/g,'-')}"
+               onkeydown="if(event.key==='Enter')saveGoalsFromModal()">
+        <span class="goal-unit">appts</span>
+      </div>`;
+  }).join('');
+  document.getElementById('goals-modal').style.display = 'flex';
+  // Focus first input
+  body.querySelector('input')?.focus();
+}
+
+function closeGoalsModal() {
+  document.getElementById('goals-modal').style.display = 'none';
+}
+
+function saveGoalsFromModal() {
+  const goals = getGoals();
+  SALES_TEAM.forEach(rep => {
+    const input = document.getElementById('goal-input-' + rep.replace(/\s+/g,'-'));
+    const val   = parseInt(input?.value, 10);
+    if (val > 0) goals[rep] = val;
+    else delete goals[rep];
+  });
+  saveGoals(goals);
+  closeGoalsModal();
+  // Re-render cards to show updated goal bars
+  if (cachedRecords.length) loadPeriodData();
+}
+
+// ── Sparklines ────────────────────────────────────────────────────
+function repSparklineData(repName) {
+  if (!cachedRecords || cachedRecords.length < 2) return null;
+  const months = [...cachedRecords].reverse().slice(-5); // oldest → newest, max 5
+  return months.map(rec => ({
+    label: (rec.label || '').replace(' 2026',''),
+    value: (rec.tableData || []).find(r => r.rep === repName)?.totalAppointments || 0
+  }));
+}
+
+function sparklineSVG(data, color) {
+  if (!data || data.length < 2) return '';
+  const bw = 8, gap = 3, h = 26;
+  const max = Math.max(...data.map(d => d.value), 1);
+  const totalW = data.length * (bw + gap) - gap;
+  const bars = data.map((d, i) => {
+    const bh  = Math.max(Math.round(d.value / max * h), 2);
+    const x   = i * (bw + gap);
+    const y   = h - bh;
+    const fill = i === data.length - 1 ? color : '#e2e8f0';
+    return `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="2" fill="${fill}"/>`;
+  }).join('');
+  return `<svg width="${totalW}" height="${h}" viewBox="0 0 ${totalW} ${h}" style="display:block">${bars}</svg>`;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Render: Team Summary
 // ═══════════════════════════════════════════════════════════════════
@@ -2121,63 +2235,95 @@ function pct(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; }
 function renderInsights(data, prev) {
   const el = document.getElementById('insights-section');
   if (!el) return;
-  // Core sales team only (excludes partnerships like Stefan)
   const team = data.filter(r => r.isTeam && !r.isPartnership);
   const partnerships = data.filter(r => r.isPartnership);
   if (!team.length && !partnerships.length) { el.innerHTML = ''; return; }
-  if (!team.length) { el.innerHTML = ''; return; } // no team data — insights require team members
+  if (!team.length) { el.innerHTML = ''; return; }
 
-  const totalAppts  = team.reduce((s,r) => s + r.totalAppointments, 0);
-  const totalMins   = team.reduce((s,r) => s + r.zoomMinutes, 0);
-  const totalZoom   = team.reduce((s,r) => s + r.zoomMeetings, 0);
-  const prevTeam    = (prev || []).filter(r => r.isTeam && !r.isPartnership);
-  const prevAppts   = prevTeam.reduce((s,r) => s + r.totalAppointments, 0);
-  const prevMins    = prevTeam.reduce((s,r) => s + r.zoomMinutes, 0);
+  const totalAppts      = team.reduce((s,r) => s + r.totalAppointments, 0);
+  const totalMins       = team.reduce((s,r) => s + r.zoomMinutes, 0);
+  const totalZoom       = team.reduce((s,r) => s + r.zoomMeetings, 0);
+  const prevTeam        = (prev || []).filter(r => r.isTeam && !r.isPartnership);
+  const prevAppts       = prevTeam.reduce((s,r) => s + r.totalAppointments, 0);
+  const prevMins        = prevTeam.reduce((s,r) => s + r.zoomMinutes, 0);
 
   // JustCall aggregates
-  const totalJcCalls     = team.reduce((s,r) => s + (r.jcCalls     || 0), 0);
-  const totalJcCompleted = team.reduce((s,r) => s + (r.jcCompleted || 0), 0);
-  const totalJcSeconds   = team.reduce((s,r) => s + (r.jcSeconds   || 0), 0);
-  const hasJustCall      = totalJcCalls > 0;
-  const prevJcCalls      = prevTeam.reduce((s,r) => s + (r.jcCalls     || 0), 0);
-  const prevJcCompleted  = prevTeam.reduce((s,r) => s + (r.jcCompleted || 0), 0);
+  const totalJcCalls    = team.reduce((s,r) => s + (r.jcCalls    || 0), 0);
+  const totalJcDone     = team.reduce((s,r) => s + (r.jcCompleted|| 0), 0);
+  const totalJcSecs     = team.reduce((s,r) => s + (r.jcSeconds  || 0), 0);
+  const hasJustCall     = totalJcCalls > 0;
+  const prevJcCalls     = prevTeam.reduce((s,r) => s + (r.jcCalls || 0), 0);
+  const jcAnswerRate    = totalJcCalls > 0 ? Math.round(totalJcDone/totalJcCalls*100) : 0;
+  const jcCallMins      = Math.round(totalJcSecs / 60);
 
-  // Top performer: score = appointments (primary) + jcCompleted bonus (secondary tiebreak)
-  const topRep = [...team].sort((a,b) => {
-    if (b.totalAppointments !== a.totalAppointments) return b.totalAppointments - a.totalAppointments;
-    return (b.jcCompleted||0) - (a.jcCompleted||0);
-  })[0];
-  const topPhoto = repPhoto(topRep.rep);
+  // Top performer: appointments first, then calls as tiebreaker
+  const topRep = [...team].sort((a,b) =>
+    b.totalAppointments !== a.totalAppointments
+      ? b.totalAppointments - a.totalAppointments
+      : (b.jcCompleted||0) - (a.jcCompleted||0)
+  )[0];
+  const topPhoto  = repPhoto(topRep.rep);
   const topAvatar = topPhoto
     ? `<img src="${topPhoto}" class="insight-performer-photo" alt="${topRep.rep}">`
     : `<div class="insight-performer-initials">${topRep.rep.split(' ').map(n=>n[0]).join('')}</div>`;
-  const topConv = topRep.conversionRate ?? (topRep.totalAppointments > 0 ? Math.round(topRep.activeAppointments/topRep.totalAppointments*100) : null);
+  const topConv = topRep.conversionRate
+    ?? (topRep.totalAppointments > 0 ? Math.round(topRep.activeAppointments/topRep.totalAppointments*100) : null);
 
-  // Trend: appointments
-  const apptDiff = prevAppts ? totalAppts - prevAppts : null;
-  const apptPct  = prevAppts ? Math.round(Math.abs(apptDiff)/prevAppts*100) : null;
-  const trendCls = apptDiff === null ? 'neutral' : apptDiff >= 0 ? 'up' : 'down';
-  const trendTxt = apptDiff === null ? 'No prior data'
+  // Check if top rep held #1 last period too
+  const prevSorted = [...prevTeam].sort((a,b) => b.totalAppointments - a.totalAppointments);
+  const isRepeatLeader = prevSorted[0]?.rep === topRep.rep;
+
+  // Appointment trend
+  const apptDiff  = prevAppts ? totalAppts - prevAppts : null;
+  const apptPct   = prevAppts ? Math.round(Math.abs(apptDiff)/prevAppts*100) : null;
+  const trendCls  = apptDiff === null ? 'neutral' : apptDiff >= 0 ? 'up' : 'down';
+  const trendTxt  = apptDiff === null ? 'No prior data'
     : `${apptDiff >= 0 ? '↑' : '↓'} ${Math.abs(apptDiff)} appts (${apptPct}%) vs last period`;
 
+  // Goal progress (team-level)
+  const goals       = getGoals();
+  const teamGoal    = SALES_TEAM.reduce((s, rep) => s + (goals[rep] || 0), 0);
+  const hasGoals    = teamGoal > 0;
+  const teamPct     = hasGoals ? Math.min(Math.round(totalAppts / teamGoal * 100), 100) : 0;
+  const goalOver    = hasGoals && totalAppts >= teamGoal;
+  const goalFillClr = goalOver ? '#4ade80' : teamPct >= 70 ? '#60a5fa' : teamPct >= 40 ? '#fbbf24' : '#f87171';
+  // Days left in current month (only meaningful on monthly view)
+  const daysLeftTxt = (() => {
+    if (activePeriod !== 'month') return '';
+    const now  = new Date();
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const days = last.getDate() - now.getDate();
+    return days > 0 ? ` · ${days}d left` : ' · last day';
+  })();
+
   // Talk time trend (Zoom)
-  const minsDiff = prevMins ? totalMins - prevMins : null;
+  const minsDiff     = prevMins ? totalMins - prevMins : null;
   const minsTrendCls = minsDiff === null ? 'neutral' : minsDiff >= 0 ? 'up' : 'down';
   const minsTrendTxt = minsDiff === null ? 'No prior data'
     : `${minsDiff >= 0 ? '↑' : '↓'} ${fmtTime(Math.abs(minsDiff))} vs last period`;
 
-  // JustCall phone activity trend
-  const jcDiff    = prevJcCalls ? totalJcCalls - prevJcCalls : null;
-  const jcPct     = prevJcCalls ? Math.round(Math.abs(jcDiff)/prevJcCalls*100) : null;
+  // JustCall trend
+  const jcDiff     = prevJcCalls ? totalJcCalls - prevJcCalls : null;
+  const jcPct      = prevJcCalls ? Math.round(Math.abs(jcDiff)/prevJcCalls*100) : null;
   const jcTrendCls = jcDiff === null ? 'neutral' : jcDiff >= 0 ? 'up' : 'down';
   const jcTrendTxt = jcDiff === null ? 'No prior data'
     : `${jcDiff >= 0 ? '↑' : '↓'} ${Math.abs(jcDiff)} calls (${jcPct}%) vs last period`;
-  const jcAnswerRate = totalJcCalls > 0 ? Math.round(totalJcCompleted/totalJcCalls*100) : 0;
-  const jcCallMins   = Math.round(totalJcSeconds / 60);
+  const topCaller  = hasJustCall
+    ? [...team].filter(r => (r.jcCalls||0) > 0).sort((a,b) => (b.jcCompleted||0)-(a.jcCompleted||0))[0]
+    : null;
 
-  // Top caller (most completed JustCall calls)
-  const topCaller = hasJustCall
-    ? [...team].filter(r => (r.jcCalls||0) > 0).sort((a,b) => (b.jcCompleted||0) - (a.jcCompleted||0))[0]
+  // Efficiency leader: best (lowest) calls-per-confirmed-appt ratio
+  // Min thresholds scale with period: need meaningful volume to rank
+  const minAppts = activePeriod === 'all' ? 30 : activePeriod === 'quarter' ? 20 : 10;
+  const minCalls = activePeriod === 'all' ? 50 : 20;
+  const effReps = hasJustCall
+    ? [...team].filter(r => r.activeAppointments >= minAppts && (r.jcCalls||0) >= minCalls)
+        .map(r => ({ ...r, eff: Math.round((r.jcCalls||0) / r.activeAppointments * 10) / 10 }))
+        .sort((a,b) => a.eff - b.eff)
+    : [];
+  const effLeader  = effReps[0] || null;
+  const teamAvgEff = effReps.length
+    ? Math.round(effReps.reduce((s,r) => s + r.eff, 0) / effReps.length * 10) / 10
     : null;
 
   // Best conversion (min 5 appts)
@@ -2187,32 +2333,45 @@ function renderInsights(data, prev) {
       const bc = b.conversionRate ?? (b.totalAppointments>0?Math.round(b.activeAppointments/b.totalAppointments*100):0);
       return bc - ac;
     })[0];
-  const convPhoto  = convLeader ? repPhoto(convLeader.rep) : null;
-  const convRate   = convLeader ? (convLeader.conversionRate ?? Math.round(convLeader.activeAppointments/convLeader.totalAppointments*100)) : null;
+  const convPhoto = convLeader ? repPhoto(convLeader.rep) : null;
+  const convRate  = convLeader
+    ? (convLeader.conversionRate ?? Math.round(convLeader.activeAppointments/convLeader.totalAppointments*100))
+    : null;
 
-  // Attention flags — include JustCall when team has data
-  const flagged = team.filter(r => {
-    if (r.totalAppointments === 0) return true;
-    if (r.totalAppointments > 0 && r.cancelledAppointments/r.totalAppointments > 0.4) return true;
-    if (activePeriod !== 'week' && activePeriod !== 'day' && r.zoomMeetings === 0 && r.totalAppointments > 5) return true;
-    if (hasJustCall && (r.jcCalls||0) === 0) return true;
-    return false;
-  });
+  // Coaching notes (specific, actionable)
+  const coachNotes = team.map(r => {
+    const notes = [];
+    if (r.totalAppointments === 0) {
+      notes.push('No appointments — check pipeline');
+    } else {
+      const cancRate = r.totalAppointments > 0 ? r.cancelledAppointments/r.totalAppointments : 0;
+      if (cancRate > 0.4) notes.push(`${Math.round(cancRate*100)}% cancellation rate — review pre-call confirmation`);
+      if (activePeriod !== 'week' && activePeriod !== 'day' && r.zoomMeetings === 0 && r.totalAppointments > 5)
+        notes.push('No Zoom — calls happening off-platform?');
+      if (hasJustCall && (r.jcCalls||0) === 0)
+        notes.push('Zero calls logged — JustCall activity missing');
+      if (hasJustCall && r.activeAppointments >= minAppts && (r.jcCalls||0) >= minCalls && teamAvgEff !== null) {
+        const myEff = Math.round((r.jcCalls||0) / r.activeAppointments * 10) / 10;
+        if (myEff > teamAvgEff * 1.5) notes.push(`${myEff}x calls/appt (team avg ${teamAvgEff}x) — review pitch quality`);
+      }
+    }
+    return notes.length ? { rep: r.rep, note: notes[0] } : null;
+  }).filter(Boolean);
 
-  // Period label
   const periodLbl = document.getElementById('period-label-display')?.textContent || '—';
+  // Card count: base 5 + 1 if JustCall (efficiency) + 1 if goals
+  const cardCount = 5 + (hasJustCall ? 1 : 0) + (hasGoals ? 1 : 0);
+  const gridCls   = `insights-cards${cardCount >= 7 ? ' has-justcall' : cardCount === 6 ? ' has-justcall' : ''}`;
 
   el.innerHTML = `
     <div class="insights-banner">
       <div class="insights-header">
-        <div class="insights-header-left">
-          <h2>📊 Performance Insights</h2>
-        </div>
+        <div class="insights-header-left"><h2>📊 Performance Insights</h2></div>
         <span class="insights-period-badge">${periodLbl}</span>
       </div>
-      <div class="insights-cards${hasJustCall ? ' has-justcall' : ''}">
+      <div class="${gridCls}">
 
-        <!-- Top Performer -->
+        <!-- 1. Top Performer -->
         <div class="insight-card">
           <div>
             <div class="insight-label">🏆 Top Performer</div>
@@ -2224,10 +2383,25 @@ function renderInsights(data, prev) {
               </div>
             </div>
           </div>
-          <span class="insight-trend up">🥇 #1 this period</span>
+          <span class="insight-trend up">${isRepeatLeader ? '🔥 #1 two periods running' : '🥇 #1 this period'}</span>
         </div>
 
-        <!-- Team Appointments Trend -->
+        <!-- 2. Goal Progress (if goals set) -->
+        ${hasGoals ? `
+        <div class="insight-card">
+          <div>
+            <div class="insight-label">🎯 Team Goal</div>
+            <div class="insight-value" style="margin-top:10px">${totalAppts} <span style="font-size:13px;font-weight:400;opacity:0.6">/ ${teamGoal}</span></div>
+            <div style="height:5px;background:rgba(255,255,255,0.1);border-radius:3px;margin:8px 0 4px;overflow:hidden">
+              <div style="height:100%;width:${teamPct}%;background:${goalFillClr};border-radius:3px;transition:width 0.4s"></div>
+            </div>
+            <div class="insight-sub">${goalOver ? '✓ Goal reached!' : teamPct + '% to team target'}${daysLeftTxt}</div>
+          </div>
+          <span class="insight-trend ${goalOver ? 'up' : teamPct >= 70 ? 'up' : teamPct >= 40 ? 'neutral' : 'down'}">${goalOver ? 'On fire 🔥' : teamPct >= 70 ? 'On track' : teamPct >= 40 ? 'Needs push' : 'Behind pace'}</span>
+        </div>
+        ` : ''}
+
+        <!-- 3. Appointments trend (always) -->
         <div class="insight-card">
           <div>
             <div class="insight-label">📅 Appointments</div>
@@ -2237,29 +2411,36 @@ function renderInsights(data, prev) {
           <span class="insight-trend ${trendCls}">${trendTxt}</span>
         </div>
 
-        <!-- Talk Time (Zoom) -->
+        <!-- 4. Talk Time -->
         <div class="insight-card">
           <div>
             <div class="insight-label">⏱ Talk Time</div>
             <div class="insight-value" style="margin-top:10px">${fmtTime(totalMins)}</div>
-            <div class="insight-sub">${totalZoom} Zoom calls hosted${hasJustCall ? ` · +${fmtTime(jcCallMins)} phone` : ''}</div>
+            <div class="insight-sub">${totalZoom} Zoom calls${hasJustCall ? ` · +${fmtTime(jcCallMins)} phone` : ''}</div>
           </div>
           <span class="insight-trend ${minsTrendCls}">${minsTrendTxt}</span>
         </div>
 
-        <!-- Phone Calls (JustCall) — only shown when data exists -->
+        <!-- 5. Efficiency (JustCall only) -->
         ${hasJustCall ? `
         <div class="insight-card">
           <div>
-            <div class="insight-label">📞 Phone Calls</div>
-            <div class="insight-value" style="margin-top:10px">${totalJcCalls}</div>
-            <div class="insight-sub">${totalJcCompleted} answered · ${jcAnswerRate}% rate${topCaller ? ` · ${topCaller.rep.split(' ')[0]} leads` : ''}</div>
+            <div class="insight-label">⚡ Efficiency</div>
+            ${effLeader ? `
+            <div class="insight-top-performer" style="margin-top:10px">
+              ${repPhoto(effLeader.rep) ? `<img src="${repPhoto(effLeader.rep)}" class="insight-performer-photo" style="width:36px;height:36px" alt="">` : `<div class="insight-performer-initials" style="width:36px;height:36px;font-size:12px">${effLeader.rep.split(' ').map(n=>n[0]).join('')}</div>`}
+              <div>
+                <div class="insight-value">${effLeader.rep.split(' ')[0]}</div>
+                <div class="insight-sub">${effLeader.eff}x calls per appt</div>
+              </div>
+            </div>
+            <span class="insight-trend up" style="margin-top:8px">Team avg ${teamAvgEff}x calls per appt</span>
+            ` : `<div class="insight-sub" style="margin-top:10px">Need ≥5 appts + 10 calls</div>`}
           </div>
-          <span class="insight-trend ${jcTrendCls}">${jcTrendTxt}</span>
         </div>
         ` : ''}
 
-        <!-- Best Conversion -->
+        <!-- 6. Best Conversion -->
         <div class="insight-card">
           <div>
             <div class="insight-label">🎯 Best Conversion</div>
@@ -2276,24 +2457,17 @@ function renderInsights(data, prev) {
           </div>
         </div>
 
-        <!-- Needs Attention -->
+        <!-- 7. Coaching Notes -->
         <div class="insight-card">
           <div>
-            <div class="insight-label">⚠️ Needs Attention</div>
-            ${flagged.length ? `
+            <div class="insight-label">💬 Coaching Notes</div>
+            ${coachNotes.length ? `
             <div class="insight-alert-list" style="margin-top:10px">
-              ${flagged.slice(0,4).map(r => {
-                const whyParts = [];
-                if (r.totalAppointments === 0) whyParts.push('No activity');
-                else {
-                  if (r.cancelledAppointments/r.totalAppointments > 0.4) whyParts.push('High cancellations');
-                  if (activePeriod !== 'week' && activePeriod !== 'day' && r.zoomMeetings === 0 && r.totalAppointments > 5) whyParts.push('No Zoom');
-                  if (hasJustCall && (r.jcCalls||0) === 0) whyParts.push('No calls');
-                }
-                return `<div class="insight-alert-item"><strong>${r.rep.split(' ')[0]}</strong> — ${whyParts.join(', ') || 'Review needed'}</div>`;
-              }).join('')}
+              ${coachNotes.slice(0,4).map(n =>
+                `<div class="insight-alert-item"><strong>${n.rep.split(' ')[0]}</strong> — ${n.note}</div>`
+              ).join('')}
             </div>
-            <span class="insight-trend down" style="margin-top:8px">${flagged.length} rep${flagged.length>1?'s':''} flagged</span>
+            <span class="insight-trend down" style="margin-top:8px">${coachNotes.length} rep${coachNotes.length>1?'s':''} need attention</span>
             ` : `<div style="margin-top:10px"><div class="insight-value" style="color:#4ade80">✓</div><div class="insight-sub">All reps on track</div></div>`}
           </div>
         </div>
@@ -2390,17 +2564,44 @@ function repCardHTML(r, colorIdx, isPartnerCard) {
        </div>`
     : '—';
 
-  // Attention flags
+  // Goal progress bar
+  const goals   = getGoals();
+  const repGoal = goals[r.rep];
+  const goalHTML = repGoal ? (() => {
+    const pct    = Math.min(Math.round(r.totalAppointments / repGoal * 100), 100);
+    const over   = r.totalAppointments >= repGoal;
+    const fillClr = over ? '#16a34a' : pct >= 70 ? '#2491EB' : pct >= 40 ? '#f59e0b' : '#ef4444';
+    return `<div class="goal-bar-wrap">
+      <div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%;background:${fillClr}"></div></div>
+      <div class="goal-bar-meta"><span>${over ? '✓ Goal hit!' : pct + '% to goal'}</span><span>${r.totalAppointments} / ${repGoal}</span></div>
+    </div>`;
+  })() : '';
+
+  // Efficiency ratio (calls per confirmed appointment)
+  const effRatio = (r.jcCalls > 0 && r.activeAppointments > 0)
+    ? Math.round(r.jcCalls / r.activeAppointments * 10) / 10
+    : null;
+  const effColor = effRatio === null ? '' : effRatio <= 5 ? '#16a34a' : effRatio <= 10 ? '#d97706' : '#dc2626';
+
+  // Sparkline (only shown in All Time view to show monthly trend)
+  const sparkData = activePeriod === 'all' ? repSparklineData(r.rep) : null;
+  const sparkHTML = sparkData
+    ? `<div class="sparkline-wrap">${sparklineSVG(sparkData, color)}<span class="sparkline-label">trend</span></div>`
+    : '';
+
+  // Attention flags (with specific coaching context)
   const flagDefs = {
     'No appointments this period': 'This rep had zero Calendly bookings in the selected period.',
     'High cancellation rate':      'More than 40% of this rep\'s appointments were cancelled. Worth a check-in.',
     'No Zoom activity':            'This rep had 5+ appointments but no recorded Zoom meetings — may indicate calls happening outside Zoom.',
+    'No calls logged':             'This rep had appointments but zero JustCall activity this period.',
   };
   const flags = [];
   if (r.totalAppointments === 0)                                                        flags.push('No appointments this period');
   if (r.totalAppointments > 0 && r.cancelledAppointments / r.totalAppointments > 0.4)  flags.push('High cancellation rate');
-  // Only flag missing Zoom when the view can actually show Zoom data (week/day views use dayData which has no Zoom)
   if (r.zoomMeetings === 0 && r.totalAppointments > 5 && activePeriod !== 'week' && activePeriod !== 'day') flags.push('No Zoom activity');
+  const teamHasJC = cachedRecords.some(rec => (rec.tableData||[]).some(row => (row.jcCalls||0) > 0));
+  if (teamHasJC && (r.jcCalls||0) === 0 && r.totalAppointments > 0)                   flags.push('No calls logged');
   const attentionHTML = flags.length
     ? `<div class="attention-strip">⚠️ ${flags[0]} <i class="tip" style="background:rgba(185,28,28,0.15);color:#b91c1c" data-tip="${flagDefs[flags[0]]}">?</i></div>` : '';
 
@@ -2453,9 +2654,13 @@ function repCardHTML(r, colorIdx, isPartnerCard) {
     <div class="rep-card" style="border-top-color:${color}">
       <div class="rep-card-header">
         ${avatar}
-        <h3>${r.rep}</h3>
+        <div style="flex:1;min-width:0">
+          <h3>${r.rep}</h3>
+          ${sparkHTML}
+        </div>
       </div>
       <div class="rep-stat"><span class="key">Appointments</span><span class="val highlight">${r.totalAppointments}${d(r.totalAppointments,'totalAppointments')}</span></div>
+      ${goalHTML}
       <div class="rep-stat"><span class="key">Conversion <i class="tip" data-tip="% of total appointments that were confirmed and not cancelled. Higher is better — e.g. 86% means 86 out of 100 bookings went ahead.">?</i></span><span class="val" style="flex:1;padding-left:8px">${convBar}</span></div>
       <div class="rep-stat"><span class="key">Cancelled</span><span class="val">${r.cancelledAppointments || '—'}${d(r.cancelledAppointments,'cancelledAppointments')}</span></div>
       ${repeatHTML}
@@ -2466,6 +2671,7 @@ function repCardHTML(r, colorIdx, isPartnerCard) {
       <div style="border-top:1px solid #f1f5f9;margin:10px 0 6px;"></div>
       <div class="rep-stat"><span class="key" style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.5px">📞 JustCall</span></div>
       ${jcHTML}
+      ${effRatio !== null ? `<div class="rep-stat"><span class="key">Calls / Appt <i class="tip" data-tip="How many calls it takes to secure one confirmed appointment. Lower is more efficient.">?</i></span><span class="val" style="color:${effColor};font-weight:700">${effRatio}x</span></div>` : ''}
       ` : ''}
       ${attentionHTML}
     </div>`;
@@ -2914,5 +3120,16 @@ async function seedIfEmpty() {
   }
 })();
 </script>
+<div id="goals-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeGoalsModal()">
+  <div class="modal-box">
+    <h3>🎯 Monthly Goals</h3>
+    <p class="modal-desc">Set appointment targets per rep. Progress bars will appear on each card.</p>
+    <div id="goals-modal-body"></div>
+    <div class="modal-actions">
+      <button class="modal-btn secondary" onclick="closeGoalsModal()">Cancel</button>
+      <button class="modal-btn primary" onclick="saveGoalsFromModal()">Save Goals</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
